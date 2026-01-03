@@ -1,21 +1,21 @@
 import { 
-  ArrowUpRight, 
   Wifi, 
   Phone, 
   Zap, 
   Tv, 
   CreditCard,
-  Gift
+  Gift,
+  Banknote
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const services = [
-  { icon: ArrowUpRight, label: 'Transfer', path: '/transfer', color: 'bg-blue-100 text-blue-600' },
   { icon: Wifi, label: 'Data', path: '/data', color: 'bg-purple-100 text-purple-600' },
   { icon: Phone, label: 'Airtime', path: '/airtime', color: 'bg-green-100 text-green-600' },
+  { icon: CreditCard, label: 'Data Card', path: '/data-card', color: 'bg-blue-100 text-blue-600' },
   { icon: Zap, label: 'Electricity', path: '/electricity', color: 'bg-yellow-100 text-yellow-600' },
   { icon: Tv, label: 'TV Sub', path: '/tv', color: 'bg-red-100 text-red-600' },
-  { icon: CreditCard, label: 'BVN & NIN', path: '/bvn-nin', color: 'bg-indigo-100 text-indigo-600' },
+  { icon: Banknote, label: 'Airtime to Cash', path: '/airtime-to-cash', color: 'bg-indigo-100 text-indigo-600' },
   { icon: Gift, label: 'Refer & Earn', path: '/referral', color: 'bg-pink-100 text-pink-600' },
 ];
 

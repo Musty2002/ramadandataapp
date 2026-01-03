@@ -1,24 +1,17 @@
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { 
-  ArrowUpRight, 
   Wifi, 
   Phone, 
   Zap, 
   Tv, 
   CreditCard,
   Gift,
+  Banknote,
   ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const services = [
-  { 
-    icon: ArrowUpRight, 
-    label: 'Transfer', 
-    description: 'Send money to friends',
-    path: '/transfer', 
-    color: 'bg-blue-100 text-blue-600' 
-  },
   { 
     icon: Wifi, 
     label: 'Data', 
@@ -32,6 +25,13 @@ const services = [
     description: 'Recharge your line',
     path: '/airtime', 
     color: 'bg-green-100 text-green-600' 
+  },
+  { 
+    icon: CreditCard, 
+    label: 'Data Card', 
+    description: 'Purchase data cards',
+    path: '/data-card', 
+    color: 'bg-blue-100 text-blue-600' 
   },
   { 
     icon: Zap, 
@@ -48,10 +48,10 @@ const services = [
     color: 'bg-red-100 text-red-600' 
   },
   { 
-    icon: CreditCard, 
-    label: 'BVN & NIN', 
-    description: 'Verify your identity',
-    path: '/bvn-nin', 
+    icon: Banknote, 
+    label: 'Airtime to Cash', 
+    description: 'Convert airtime to cash',
+    path: '/airtime-to-cash', 
     color: 'bg-indigo-100 text-indigo-600' 
   },
   { 
