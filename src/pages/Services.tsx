@@ -7,6 +7,7 @@ import {
   CreditCard,
   Gift,
   Banknote,
+  Fingerprint,
   ChevronRight
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +54,13 @@ const services = [
     description: 'Convert airtime to cash',
     path: '/airtime-to-cash', 
     color: 'bg-indigo-100 text-indigo-600' 
+  },
+  { 
+    icon: Fingerprint, 
+    label: 'BVN/NIN', 
+    description: 'Verify your identity',
+    path: '/bvn-nin', 
+    color: 'bg-orange-100 text-orange-600' 
   },
   { 
     icon: Gift, 

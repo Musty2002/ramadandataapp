@@ -5,7 +5,8 @@ import {
   Tv, 
   CreditCard,
   Gift,
-  Banknote
+  Banknote,
+  Fingerprint
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +17,7 @@ const services = [
   { icon: Zap, label: 'Electricity', path: '/electricity', color: 'bg-yellow-100 text-yellow-600' },
   { icon: Tv, label: 'TV Sub', path: '/tv', color: 'bg-red-100 text-red-600' },
   { icon: Banknote, label: 'Airtime to Cash', path: '/airtime-to-cash', color: 'bg-indigo-100 text-indigo-600' },
+  { icon: Fingerprint, label: 'BVN/NIN', path: '/bvn-nin', color: 'bg-orange-100 text-orange-600' },
   { icon: Gift, label: 'Refer & Earn', path: '/referral', color: 'bg-pink-100 text-pink-600' },
 ];
 
