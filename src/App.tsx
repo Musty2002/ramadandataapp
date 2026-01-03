@@ -19,6 +19,7 @@ import TV from "./pages/TV";
 import Transfer from "./pages/Transfer";
 import AddMoney from "./pages/AddMoney";
 import BvnNin from "./pages/BvnNin";
+import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -164,6 +165,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <BvnNin />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
           </ProtectedRoute>
         }
       />
