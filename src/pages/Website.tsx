@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom';
-import { Smartphone, Wifi, Zap, Tv, ArrowRight, Shield, Clock, Users, Mail, Phone, MapPin } from 'lucide-react';
+import { Smartphone, Wifi, Zap, Tv, Shield, Clock, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/ramadan-logo.jpeg';
 import iphoneMockup from '@/assets/iphone-mockup.png';
@@ -88,9 +87,6 @@ export default function Website() {
               <img src={logo} alt="Ramadan Data App" className="h-10 w-10 rounded-full object-cover" />
               <span className="text-xl font-bold text-primary">Ramadan Data App</span>
             </div>
-            <Link to="/auth">
-              <Button>Get Started</Button>
-            </Link>
           </div>
         </div>
       </nav>
@@ -106,13 +102,6 @@ export default function Website() {
               <p className="text-lg sm:text-xl text-muted-foreground mb-8">
                 Buy data bundles, airtime, pay electricity bills, and TV subscriptions at the best rates in Nigeria. Fast, secure, and reliable.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
-                <Link to="/auth">
-                  <Button size="lg" className="w-full sm:w-auto">
-                    Start Now <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
             </div>
             
             {/* iPhone Mockup */}
@@ -229,14 +218,9 @@ export default function Website() {
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-primary text-primary-foreground">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl sm:text-4xl font-bold mb-4">Ready to Get Started?</h2>
-          <p className="text-lg opacity-90 mb-8">
+          <p className="text-lg opacity-90">
             Join thousands of Nigerians who trust Ramadan Data App for their daily digital needs.
           </p>
-          <Link to="/auth">
-            <Button size="lg" variant="secondary">
-              Create Free Account <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </Link>
         </div>
       </section>
 
@@ -259,7 +243,6 @@ export default function Website() {
             <div>
               <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
               <ul className="space-y-2 text-sm">
-                <li><Link to="/auth" className="text-muted-foreground hover:text-primary transition-colors">Get Started</Link></li>
                 <li><a href="#services" className="text-muted-foreground hover:text-primary transition-colors">Services</a></li>
                 <li><a href="#features" className="text-muted-foreground hover:text-primary transition-colors">Why Choose Us</a></li>
               </ul>
@@ -277,13 +260,13 @@ export default function Website() {
                 </li>
                 <li className="flex items-center gap-2 text-muted-foreground">
                   <Phone className="h-4 w-4 text-primary" />
-                  <a href="tel:+2348012345678" className="hover:text-primary transition-colors">
-                    +234 801 234 5678
+                  <a href="tel:+2349068502050" className="hover:text-primary transition-colors">
+                    +234 906 850 2050
                   </a>
                 </li>
                 <li className="flex items-start gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4 text-primary mt-0.5" />
-                  <span>Lagos, Nigeria</span>
+                  <span>Taraba, Nigeria</span>
                 </li>
               </ul>
             </div>
