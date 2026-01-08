@@ -5,7 +5,7 @@ interface IPhoneMockupProps {
 
 export function IPhoneMockup({ screenshot, alt = "App screenshot" }: IPhoneMockupProps) {
   return (
-    <div className="relative mx-auto" style={{ width: '280px', height: '570px' }}>
+    <div className="relative mx-auto" style={{ width: '264px', height: '572px' }}>
       {/* iPhone Frame */}
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-800 to-zinc-900 rounded-[3rem] shadow-2xl">
         {/* Inner bezel */}
@@ -14,13 +14,15 @@ export function IPhoneMockup({ screenshot, alt = "App screenshot" }: IPhoneMocku
           <div className="absolute inset-[3px] bg-black rounded-[2.6rem] overflow-hidden">
             {/* Dynamic Island */}
             <div className="absolute top-3 left-1/2 -translate-x-1/2 w-[90px] h-[28px] bg-black rounded-full z-20" />
-            
+
             {/* Screen content */}
-            <div className="absolute inset-0 overflow-hidden rounded-[2.4rem]">
-              <img 
-                src={screenshot} 
+            <div className="absolute inset-0 overflow-hidden rounded-[2.4rem] bg-black">
+              <img
+                src={screenshot}
                 alt={alt}
-                className="w-full h-full object-cover object-top"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover [object-position:42%_0%] scale-[1.01]"
               />
             </div>
           </div>
