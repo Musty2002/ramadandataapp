@@ -22,7 +22,7 @@ export function IPhoneMockup({ screenshot, alt = "App screenshot" }: IPhoneMocku
                 alt={alt}
                 loading="lazy"
                 decoding="async"
-                className="w-full h-full object-cover [object-position:42%_0%] scale-[1.01]"
+                className="w-full h-full object-cover object-top"
               />
             </div>
           </div>
