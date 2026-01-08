@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import logo from '@/assets/logo.jpeg';
+import logo from '@/assets/ramadan-logo.jpeg';
 
 const signUpSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -135,8 +135,8 @@ export default function Auth() {
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 bg-background">
       {/* Logo */}
       <div className="mb-8 text-center">
-        <img src={logo} alt="Ramadan Data Sub" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
-        <h1 className="text-2xl font-bold text-primary">Ramadan Data Sub</h1>
+        <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
+        <h1 className="text-2xl font-bold text-primary">Ramadan Data App</h1>
         <p className="text-muted-foreground text-sm mt-1">Your trusted payment partner</p>
       </div>
 

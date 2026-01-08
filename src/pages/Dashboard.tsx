@@ -4,7 +4,7 @@ import { ServicesGrid } from '@/components/dashboard/ServicesGrid';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
 import { Bell } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import logo from '@/assets/logo.jpeg';
+import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -14,8 +14,8 @@ export default function Dashboard() {
       <div className="safe-area-top">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4">
-          <img src={logo} alt="Ramadan Data Sub" className="h-10 w-10 rounded-full object-cover" />
-          <h1 className="text-lg font-bold text-primary">Ramadan Data Sub</h1>
+          <img src={logo} alt="Ramadan Data App" className="h-10 w-10 rounded-full object-cover" />
+          <h1 className="text-lg font-bold text-primary">Ramadan Data App</h1>
           <button 
             onClick={() => navigate('/notifications')}
             className="relative w-10 h-10 flex items-center justify-center rounded-full bg-muted hover:bg-muted/80 transition-colors"
