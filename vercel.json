@@ -1,79 +1,14 @@
 {
-  "rewrites": [
-    {
-      "source": "/",
-      "destination": "/website"
-    }
-  ],
   "redirects": [
     {
-      "source": "/dashboard",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/auth",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/services",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/history",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/profile",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/notifications",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/referral",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/add-money",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/transfer",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/airtime",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/data",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/electricity",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/tv",
-      "destination": "/website",
-      "permanent": false
-    },
-    {
-      "source": "/bvn-nin",
-      "destination": "/website",
+      "source": "/((?!website).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.ramadandataapp.com.ng"
+        }
+      ],
+      "destination": "https://www.ramadandataapp.com.ng/website",
       "permanent": false
     }
   ]
