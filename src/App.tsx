@@ -20,6 +20,7 @@ import Transfer from "./pages/Transfer";
 import AddMoney from "./pages/AddMoney";
 import BvnNin from "./pages/BvnNin";
 import Notifications from "./pages/Notifications";
+import Website from "./pages/Website";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,7 +64,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/website" replace />} />
+      <Route path="/website" element={<Website />} />
       <Route
         path="/auth"
         element={
