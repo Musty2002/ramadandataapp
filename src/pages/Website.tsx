@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import { Smartphone, Wifi, Zap, Tv, ArrowRight, Shield, Clock, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { IPhoneMockup } from '@/components/website/IPhoneMockup';
 import logo from '@/assets/ramadan-logo.jpeg';
-import appScreenshot from '@/assets/app-screenshot.png';
+import iphoneMockup from '@/assets/iphone-mockup.png';
 
 // Social media icons as simple SVG components
 const WhatsAppIcon = () => (
@@ -121,9 +120,11 @@ export default function Website() {
               <div className="relative flex items-center justify-center">
                 {/* Glow effect behind phone */}
                 <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full scale-90 translate-y-4" />
-                <div className="relative z-10">
-                  <IPhoneMockup screenshot={appScreenshot} alt="Ramadan Data App Interface" />
-                </div>
+                <img 
+                  src={iphoneMockup} 
+                  alt="Ramadan Data App Interface" 
+                  className="relative z-10 w-[280px] h-auto drop-shadow-2xl"
+                />
               </div>
             </div>
           </div>
