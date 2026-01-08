@@ -123,7 +123,7 @@ export default function Website() {
                 <img 
                   src={iphoneMockup} 
                   alt="Ramadan Data App Interface" 
-                  className="relative z-10 w-[280px] h-auto drop-shadow-2xl"
+                  className="relative z-10 w-[340px] h-auto drop-shadow-2xl"
                 />
               </div>
             </div>
