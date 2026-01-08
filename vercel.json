@@ -1,14 +1,20 @@
 {
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "redirects": [
     {
-      "source": "/((?!website).*)",
+      "source": "/",
       "has": [
         {
           "type": "host",
           "value": "www.ramadandataapp.com.ng"
         }
       ],
-      "destination": "https://www.ramadandataapp.com.ng/website",
+      "destination": "/website",
       "permanent": false
     }
   ]
