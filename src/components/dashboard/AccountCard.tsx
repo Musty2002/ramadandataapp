@@ -12,8 +12,9 @@ export function AccountCard() {
   const navigate = useNavigate();
 
   const copyAccountNumber = () => {
-    if (profile?.account_number) {
-      navigator.clipboard.writeText(profile.account_number);
+    const accountNumber = profile?.virtual_account_number || profile?.account_number;
+    if (accountNumber) {
+      navigator.clipboard.writeText(accountNumber);
       toast({
         title: 'Copied!',
         description: 'Account number copied to clipboard',
@@ -29,22 +30,27 @@ export function AccountCard() {
     }).format(balance);
   };
 
+  // Use virtual account if available, otherwise show placeholder
+  const displayAccountNumber = profile?.virtual_account_number || profile?.account_number || '----------';
+  const displayBankName = profile?.virtual_account_bank || 'Ramadan Data Sub';
+  const displayAccountName = profile?.virtual_account_name || profile?.full_name || 'User';
+
   return (
     <div className="gradient-primary rounded-2xl p-5 text-primary-foreground mx-4 shadow-lg">
       {/* Account Info */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-sm opacity-90">{profile?.account_number || '----------'}</span>
+          <span className="text-sm opacity-90">{displayAccountNumber}</span>
           <button onClick={copyAccountNumber} className="p-1 hover:bg-white/10 rounded">
             <Copy className="w-4 h-4" />
           </button>
         </div>
-        <span className="text-xs opacity-75">Ramadan Data Sub</span>
+        <span className="text-xs opacity-75">{displayBankName}</span>
       </div>
 
       {/* User Name */}
       <p className="text-sm opacity-90 mb-1">Hello,</p>
-      <h2 className="text-lg font-semibold mb-4">{profile?.full_name || 'User'}</h2>
+      <h2 className="text-lg font-semibold mb-4">{displayAccountName}</h2>
 
       {/* Balance */}
       <div className="mb-1">
