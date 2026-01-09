@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { ArrowUpRight, ArrowDownLeft, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,18 +23,13 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TransactionCategory | 'all'>('all');
 
-  useEffect(() => {
-    if (user) {
-      fetchTransactions();
-    }
-  }, [user, filter]);
-
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
     setLoading(true);
     let query = supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', user!.id)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (filter !== 'all') {
@@ -50,7 +45,61 @@ export default function History() {
       setTransactions(normalized as Transaction[]);
     }
     setLoading(false);
-  };
+  }, [user, filter]);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [fetchTransactions]);
+
+  // Realtime subscription for new/updated transactions
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('history-transactions')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newTx = {
+            ...(payload.new as any),
+            amount: Number((payload.new as any).amount),
+          } as Transaction;
+          // Prepend if matches current filter or filter is 'all'
+          if (filter === 'all' || newTx.category === filter) {
+            setTransactions((prev) => [newTx, ...prev]);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updated = {
+            ...(payload.new as any),
+            amount: Number((payload.new as any).amount),
+          } as Transaction;
+          setTransactions((prev) =>
+            prev.map((tx) => (tx.id === updated.id ? updated : tx))
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, filter]);
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
