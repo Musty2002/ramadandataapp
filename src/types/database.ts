@@ -14,6 +14,10 @@ export interface Profile {
   referral_code: string;
   referred_by: string | null;
   avatar_url: string | null;
+  virtual_account_number: string | null;
+  virtual_account_bank: string | null;
+  virtual_account_name: string | null;
+  virtual_account_reference: string | null;
   created_at: string;
   updated_at: string;
 }
