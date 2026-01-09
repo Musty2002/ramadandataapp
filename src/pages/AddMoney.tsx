@@ -12,12 +12,30 @@ export default function AddMoney() {
   const { profile, refreshProfile, user } = useAuth();
   const { toast } = useToast();
   const [isCreating, setIsCreating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Refresh profile on mount to get latest data
+  useEffect(() => {
+    if (user) {
+      refreshProfile();
+    }
+  }, [user]);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast({
       title: 'Copied!',
       description: `${label} copied to clipboard`,
+    });
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await refreshProfile();
+    setIsRefreshing(false);
+    toast({
+      title: 'Refreshed',
+      description: 'Account details updated',
     });
   };
 
@@ -41,18 +59,23 @@ export default function AddMoney() {
         },
       });
 
+      console.log('Create virtual account response:', response);
+
       if (response.error) {
         throw new Error(response.error.message);
       }
 
-      if (response.data.success) {
+      if (response.data?.success) {
         toast({
           title: 'Success!',
           description: 'Your virtual account has been created',
         });
+        // Refresh profile to get the new virtual account details
         await refreshProfile();
+      } else if (response.data?.error) {
+        throw new Error(response.data.error);
       } else {
-        throw new Error(response.data.error || 'Failed to create virtual account');
+        throw new Error('Unexpected response from server');
       }
     } catch (error: any) {
       console.error('Error creating virtual account:', error);
@@ -67,17 +90,27 @@ export default function AddMoney() {
   };
 
   // Check if user has virtual account
-  const hasVirtualAccount = profile?.virtual_account_number;
+  const hasVirtualAccount = !!profile?.virtual_account_number;
 
   return (
     <MobileLayout showNav={false}>
       <div className="safe-area-top">
         {/* Header */}
-        <div className="flex items-center gap-4 px-4 py-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 className="text-lg font-bold text-foreground">Add Money</h1>
+        <div className="flex items-center justify-between px-4 py-4">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-bold text-foreground">Add Money</h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
 
         <div className="px-4 pb-6">
@@ -100,13 +133,13 @@ export default function AddMoney() {
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Bank Name</p>
                       <p className="font-semibold text-foreground">
-                        {profile?.virtual_account_bank || 'Opay'}
+                        {profile?.virtual_account_bank || 'Palmpay'}
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => copyToClipboard(profile?.virtual_account_bank || 'Opay', 'Bank name')}
+                      onClick={() => copyToClipboard(profile?.virtual_account_bank || 'Palmpay', 'Bank name')}
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
