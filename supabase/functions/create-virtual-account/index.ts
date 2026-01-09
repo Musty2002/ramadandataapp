@@ -9,10 +9,10 @@ interface PaymentPointResponse {
   status: boolean
   message: string
   data?: {
-    account_number: string
-    account_name: string
-    bank_name: string
-    reference: string
+    accountNumber: string
+    accountName: string
+    bankName: string
+    bankCode: string
   }
 }
 
@@ -82,31 +82,47 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Generate unique reference
-    const reference = `VA_${user.id.replace(/-/g, '').substring(0, 16)}_${Date.now()}`
+    console.log('Creating virtual account for user:', user.id)
 
-    console.log('Creating virtual account for user:', user.id, 'with reference:', reference)
-
-    // Create virtual account via Payment Point API (Opay only)
-    const response = await fetch('https://paymentpoint.co/api/v1/virtual-account/create', {
+    // Create virtual account via Payment Point API
+    // API endpoint: https://api.paymentpoint.co/api/v1/createVirtualAccount
+    // Headers: Authorization: Bearer {apiSecret}, api-key: {apiKey}
+    // Body: email, name, phoneNumber, bankCode (array), businessId
+    const response = await fetch('https://api.paymentpoint.co/api/v1/createVirtualAccount', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Api-Key': apiKey,
-        'Api-Secret': apiSecret,
+        'Authorization': `Bearer ${apiSecret}`,
+        'api-key': apiKey,
       },
       body: JSON.stringify({
-        business_id: businessId,
-        customer_name: profile.full_name,
-        customer_email: profile.email || `${user.id}@ramadandata.app`,
-        customer_phone: profile.phone,
-        reference: reference,
-        bank: 'opay', // Opay only as per user preference
+        email: profile.email || `user${user.id.substring(0, 8)}@ramadandata.app`,
+        name: profile.full_name,
+        phoneNumber: profile.phone,
+        bankCode: ['20897'], // Opay only (20897 = Opay, 20946 = PalmPay)
+        businessId: businessId,
       }),
     })
 
-    const result: PaymentPointResponse = await response.json()
-    console.log('Payment Point response:', JSON.stringify(result))
+    // Log raw response for debugging
+    const responseText = await response.text()
+    console.log('Payment Point raw response:', responseText)
+    console.log('Response status:', response.status)
+
+    // Try to parse as JSON
+    let result: PaymentPointResponse
+    try {
+      result = JSON.parse(responseText)
+    } catch (parseError) {
+      console.error('Failed to parse Payment Point response as JSON:', parseError)
+      console.error('Raw response was:', responseText.substring(0, 500))
+      return new Response(
+        JSON.stringify({ error: 'Invalid response from payment provider' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('Payment Point parsed response:', JSON.stringify(result))
 
     if (!result.status || !result.data) {
       console.error('Payment Point error:', result.message)
@@ -120,10 +136,10 @@ Deno.serve(async (req) => {
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
-        virtual_account_number: result.data.account_number,
-        virtual_account_bank: result.data.bank_name,
-        virtual_account_name: result.data.account_name,
-        virtual_account_reference: reference,
+        virtual_account_number: result.data.accountNumber,
+        virtual_account_bank: result.data.bankName,
+        virtual_account_name: result.data.accountName,
+        virtual_account_reference: user.id, // Use user ID as reference
       })
       .eq('user_id', user.id)
 
@@ -142,9 +158,9 @@ Deno.serve(async (req) => {
         success: true,
         message: 'Virtual account created successfully',
         data: {
-          account_number: result.data.account_number,
-          account_name: result.data.account_name,
-          bank_name: result.data.bank_name,
+          account_number: result.data.accountNumber,
+          account_name: result.data.accountName,
+          bank_name: result.data.bankName,
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
