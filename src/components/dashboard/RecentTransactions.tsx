@@ -6,7 +6,7 @@ import { Transaction } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 
-export function RecentTransactions() {
+export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }) {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,8 @@ export function RecentTransactions() {
     if (user) {
       fetchTransactions();
     }
-  }, [user]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, refreshTick]);
 
   const fetchTransactions = async () => {
     const { data } = await supabase
@@ -27,7 +28,11 @@ export function RecentTransactions() {
       .limit(5);
 
     if (data) {
-      setTransactions(data as Transaction[]);
+      const normalized = (data as any[]).map((row) => ({
+        ...row,
+        amount: Number(row.amount),
+      }));
+      setTransactions(normalized as Transaction[]);
     }
     setLoading(false);
   };

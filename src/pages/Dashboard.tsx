@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AccountCard } from '@/components/dashboard/AccountCard';
 import { ServicesGrid } from '@/components/dashboard/ServicesGrid';
@@ -13,9 +14,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { refreshWallet, refreshProfile } = useAuth();
   const { toast } = useToast();
+  const [refreshTick, setRefreshTick] = useState(0);
 
   const handleRefresh = async () => {
     await Promise.all([refreshWallet(), refreshProfile()]);
+    setRefreshTick((t) => t + 1);
     toast({
       title: 'Refreshed',
       description: 'Your data has been updated',
@@ -46,7 +49,7 @@ export default function Dashboard() {
           <ServicesGrid />
 
           {/* Recent Transactions */}
-          <RecentTransactions />
+          <RecentTransactions refreshTick={refreshTick} />
         </div>
       </PullToRefresh>
     </MobileLayout>

@@ -43,7 +43,11 @@ export default function History() {
 
     const { data } = await query;
     if (data) {
-      setTransactions(data as Transaction[]);
+      const normalized = (data as any[]).map((row) => ({
+        ...row,
+        amount: Number(row.amount),
+      }));
+      setTransactions(normalized as Transaction[]);
     }
     setLoading(false);
   };

@@ -43,9 +43,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
-    
+
     if (data) {
-      setWallet(data as Wallet);
+      const row = data as any;
+      const parsedBalance = Number(row.balance);
+      setWallet({
+        ...(row as Wallet),
+        balance: Number.isFinite(parsedBalance) ? parsedBalance : 0,
+      });
     }
   };
 
