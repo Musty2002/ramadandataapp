@@ -1,14 +1,17 @@
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Copy, Building2 } from 'lucide-react';
+import { ArrowLeft, Copy, Building2, Loader2, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function AddMoney() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, refreshProfile, user } = useAuth();
   const { toast } = useToast();
+  const [isCreating, setIsCreating] = useState(false);
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
@@ -17,6 +20,54 @@ export default function AddMoney() {
       description: `${label} copied to clipboard`,
     });
   };
+
+  const createVirtualAccount = async () => {
+    if (!user) {
+      toast({
+        title: 'Error',
+        description: 'Please log in to create a virtual account',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await supabase.functions.invoke('create-virtual-account', {
+        headers: {
+          Authorization: `Bearer ${session.session?.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
+      if (response.data.success) {
+        toast({
+          title: 'Success!',
+          description: 'Your virtual account has been created',
+        });
+        await refreshProfile();
+      } else {
+        throw new Error(response.data.error || 'Failed to create virtual account');
+      }
+    } catch (error: any) {
+      console.error('Error creating virtual account:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create virtual account',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  // Check if user has virtual account
+  const hasVirtualAccount = profile?.virtual_account_number;
 
   return (
     <MobileLayout showNav={false}>
@@ -42,57 +93,83 @@ export default function AddMoney() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="bg-secondary/50 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Bank Name</p>
-                    <p className="font-semibold text-foreground">Providus Bank</p>
+            {hasVirtualAccount ? (
+              <div className="space-y-4">
+                <div className="bg-secondary/50 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Bank Name</p>
+                      <p className="font-semibold text-foreground">
+                        {profile?.virtual_account_bank || 'Opay'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(profile?.virtual_account_bank || 'Opay', 'Bank name')}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard('Providus Bank', 'Bank name')}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
                 </div>
-              </div>
 
-              <div className="bg-secondary/50 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-                    <p className="font-semibold text-foreground text-lg tracking-wide">
-                      {profile?.account_number || '----------'}
-                    </p>
+                <div className="bg-secondary/50 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                      <p className="font-semibold text-foreground text-lg tracking-wide">
+                        {profile?.virtual_account_number || '----------'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(profile?.virtual_account_number || '', 'Account number')}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(profile?.account_number || '', 'Account number')}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
                 </div>
-              </div>
 
-              <div className="bg-secondary/50 rounded-xl p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Account Name</p>
-                    <p className="font-semibold text-foreground">{profile?.full_name || 'User'}</p>
+                <div className="bg-secondary/50 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Account Name</p>
+                      <p className="font-semibold text-foreground">
+                        {profile?.virtual_account_name || profile?.full_name || 'User'}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => copyToClipboard(profile?.virtual_account_name || profile?.full_name || '', 'Account name')}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(profile?.full_name || '', 'Account name')}
-                  >
-                    <Copy className="w-4 h-4" />
-                  </Button>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-6">
+                <p className="text-muted-foreground mb-4">
+                  Generate your dedicated virtual account to receive payments
+                </p>
+                <Button 
+                  onClick={createVirtualAccount} 
+                  disabled={isCreating}
+                  className="w-full"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    'Generate Virtual Account'
+                  )}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Info */}
