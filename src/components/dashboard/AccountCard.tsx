@@ -35,8 +35,9 @@ export function AccountCard() {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          if (payload.new && typeof payload.new.balance === 'number') {
-            setLiveBalance(payload.new.balance);
+          if (payload.new && payload.new.balance !== undefined) {
+            const nextBalance = Number((payload.new as any).balance);
+            if (Number.isFinite(nextBalance)) setLiveBalance(nextBalance);
           }
         }
       )
