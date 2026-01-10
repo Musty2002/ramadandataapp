@@ -65,7 +65,8 @@ Deno.serve(async (req) => {
 
     const transactionReference = isLegacy ? body.data?.transaction_reference : body.transaction_id
 
-    const amount = isLegacy ? body.data?.amount : body.amount_paid
+    // Use settlement_amount (after fees) instead of amount_paid for accurate balance
+    const amount = isLegacy ? body.data?.amount : (body.settlement_amount ?? body.amount_paid)
 
     const statusOk = isLegacy
       ? body.event === 'virtual_account.payment' && body.data?.status === 'successful'
