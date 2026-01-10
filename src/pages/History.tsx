@@ -204,6 +204,12 @@ export default function History() {
                         <p className="text-xs text-muted-foreground">
                           {format(new Date(tx.created_at), 'h:mm a')}
                         </p>
+                        {/* Show fee breakdown for deposits */}
+                        {tx.category === 'deposit' && tx.metadata && (tx.metadata as any).raw?.settlement_fee && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Paid: ₦{Number((tx.metadata as any).raw.amount_paid).toLocaleString()} • Fee: ₦{Number((tx.metadata as any).raw.settlement_fee).toLocaleString()}
+                          </p>
+                        )}
                       </div>
                       <div className="text-right">
                         <span
