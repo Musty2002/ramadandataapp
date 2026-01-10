@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Eye, EyeOff, Copy, Plus, History } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Eye, EyeOff, Copy, Plus, History, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -7,9 +7,12 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 export function AccountCard() {
-  const { profile, wallet, user, refreshWallet } = useAuth();
+  const { profile, wallet, user, refreshProfile } = useAuth();
   const [showBalance, setShowBalance] = useState(true);
   const [liveBalance, setLiveBalance] = useState<number>(wallet?.balance || 0);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -19,6 +22,60 @@ export function AccountCard() {
       setLiveBalance(wallet.balance);
     }
   }, [wallet?.balance]);
+
+  // Auto-create virtual account if not exists
+  useEffect(() => {
+    if (!user?.id || !profile) return;
+    
+    // If no virtual account, start creation
+    if (!profile.virtual_account_number && !creatingAccount && retryCountRef.current < maxRetries) {
+      createVirtualAccount();
+    }
+  }, [user?.id, profile?.virtual_account_number]);
+
+  const createVirtualAccount = async () => {
+    if (creatingAccount) return;
+    
+    setCreatingAccount(true);
+    retryCountRef.current += 1;
+    
+    try {
+      const response = await supabase.functions.invoke('create-virtual-account');
+      
+      if (response.error) {
+        console.error('Virtual account creation failed:', response.error);
+        
+        // Retry after delay if under max retries
+        if (retryCountRef.current < maxRetries) {
+          setTimeout(() => {
+            setCreatingAccount(false);
+          }, 5000 * retryCountRef.current); // Exponential backoff: 5s, 10s, 15s
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Account Setup Failed',
+            description: 'Unable to create virtual account. Please try again from Add Money page.',
+          });
+          setCreatingAccount(false);
+        }
+      } else {
+        // Success - refresh profile to get new account details
+        await refreshProfile?.();
+        setCreatingAccount(false);
+        retryCountRef.current = 0;
+      }
+    } catch (err) {
+      console.error('Error creating virtual account:', err);
+      
+      if (retryCountRef.current < maxRetries) {
+        setTimeout(() => {
+          setCreatingAccount(false);
+        }, 5000 * retryCountRef.current);
+      } else {
+        setCreatingAccount(false);
+      }
+    }
+  };
 
   // Subscribe to realtime wallet updates
   useEffect(() => {
@@ -48,8 +105,33 @@ export function AccountCard() {
     };
   }, [user?.id]);
 
+  // Subscribe to profile updates (for virtual account creation)
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('profile-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          refreshProfile?.();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refreshProfile]);
+
   const copyAccountNumber = () => {
-    const accountNumber = profile?.virtual_account_number || profile?.account_number;
+    const accountNumber = profile?.virtual_account_number;
     if (accountNumber) {
       navigator.clipboard.writeText(accountNumber);
       toast({
@@ -67,8 +149,8 @@ export function AccountCard() {
     }).format(balance);
   };
 
-  const displayAccountNumber = profile?.virtual_account_number || profile?.account_number || '----------';
-  const displayBankName = profile?.virtual_account_bank || 'Pending...';
+  const hasVirtualAccount = !!profile?.virtual_account_number;
+  const isLoading = !hasVirtualAccount && (creatingAccount || retryCountRef.current < maxRetries);
   const displayName = profile?.full_name || 'User';
 
   return (
@@ -97,17 +179,39 @@ export function AccountCard() {
 
       {/* Account Details */}
       <div className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 mb-4">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs opacity-70">{displayBankName}</p>
-          <p className="text-sm font-medium truncate">{displayAccountNumber}</p>
-        </div>
-        <button 
-          onClick={copyAccountNumber} 
-          className="p-2 hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
-          title="Copy account number"
-        >
-          <Copy className="w-4 h-4" />
-        </button>
+        {isLoading ? (
+          <div className="flex-1 flex items-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <div>
+              <p className="text-xs opacity-70">Setting up your account...</p>
+              <p className="text-sm font-medium">Creating virtual bank account</p>
+            </div>
+          </div>
+        ) : hasVirtualAccount ? (
+          <>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs opacity-70">{profile.virtual_account_bank}</p>
+              <p className="text-sm font-medium truncate">{profile.virtual_account_number}</p>
+            </div>
+            <button 
+              onClick={copyAccountNumber} 
+              className="p-2 hover:bg-white/10 rounded-full transition-colors flex-shrink-0"
+              title="Copy account number"
+            >
+              <Copy className="w-4 h-4" />
+            </button>
+          </>
+        ) : (
+          <div className="flex-1">
+            <p className="text-xs opacity-70">Account setup failed</p>
+            <button 
+              onClick={() => { retryCountRef.current = 0; createVirtualAccount(); }}
+              className="text-sm font-medium underline"
+            >
+              Tap to retry
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Action Buttons */}
