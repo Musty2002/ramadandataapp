@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 const signUpSchema = z.object({
@@ -115,8 +116,32 @@ export default function Auth() {
         } else {
           toast({
             title: 'Welcome!',
-            description: 'Your account has been created successfully.',
+            description: 'Creating your account and virtual bank account...',
           });
+          
+          // Automatically create virtual account after signup
+          try {
+            const { data: session } = await supabase.auth.getSession();
+            if (session?.session) {
+              const response = await supabase.functions.invoke('create-virtual-account');
+              if (response.error) {
+                console.error('Virtual account creation failed:', response.error);
+                toast({
+                  variant: 'destructive',
+                  title: 'Virtual Account',
+                  description: 'Account created but virtual bank account setup failed. You can try again from Add Money.',
+                });
+              } else {
+                toast({
+                  title: 'Setup Complete!',
+                  description: 'Your account and virtual bank account are ready.',
+                });
+              }
+            }
+          } catch (err) {
+            console.error('Error creating virtual account:', err);
+          }
+          
           navigate('/dashboard');
         }
       }
