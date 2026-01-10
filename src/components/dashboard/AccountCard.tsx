@@ -11,7 +11,9 @@ export function AccountCard() {
   const [showBalance, setShowBalance] = useState(true);
   const [liveBalance, setLiveBalance] = useState<number>(wallet?.balance || 0);
   const [creatingAccount, setCreatingAccount] = useState(false);
+  const [retryScheduled, setRetryScheduled] = useState(false);
   const retryCountRef = useRef(0);
+  const retryTimeoutRef = useRef<number | null>(null);
   const maxRetries = 3;
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -23,56 +25,87 @@ export function AccountCard() {
     }
   }, [wallet?.balance]);
 
+  // Clear scheduled retries on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        window.clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Auto-create virtual account if not exists
   useEffect(() => {
     if (!user?.id || !profile) return;
-    
-    // If no virtual account, start creation
-    if (!profile.virtual_account_number && !creatingAccount && retryCountRef.current < maxRetries) {
+
+    if (!profile.virtual_account_number && !creatingAccount && !retryScheduled && retryCountRef.current < maxRetries) {
       createVirtualAccount();
     }
-  }, [user?.id, profile?.virtual_account_number]);
+  }, [user?.id, profile?.id, profile?.virtual_account_number, creatingAccount, retryScheduled]);
 
   const createVirtualAccount = async () => {
     if (creatingAccount) return;
-    
+
+    // Cancel any scheduled retry
+    if (retryTimeoutRef.current) {
+      window.clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+
+    setRetryScheduled(false);
     setCreatingAccount(true);
     retryCountRef.current += 1;
-    
+
     try {
       const response = await supabase.functions.invoke('create-virtual-account');
-      
-      if (response.error) {
-        console.error('Virtual account creation failed:', response.error);
-        
-        // Retry after delay if under max retries
+
+      if (response.error || response.data?.error) {
+        const message = response.error?.message || response.data?.error || 'Failed to create virtual account';
+        console.error('Virtual account creation failed:', message);
+
         if (retryCountRef.current < maxRetries) {
-          setTimeout(() => {
-            setCreatingAccount(false);
-          }, 5000 * retryCountRef.current); // Exponential backoff: 5s, 10s, 15s
+          const backoffMs = 5000 * retryCountRef.current; // 5s, 10s, 15s
+          setCreatingAccount(false);
+          setRetryScheduled(true);
+
+          retryTimeoutRef.current = window.setTimeout(() => {
+            setRetryScheduled(false);
+            createVirtualAccount();
+          }, backoffMs);
         } else {
           toast({
             variant: 'destructive',
             title: 'Account Setup Failed',
-            description: 'Unable to create virtual account. Please try again from Add Money page.',
+            description: 'Virtual account was created on the provider but could not be saved. Tap to retry.',
           });
           setCreatingAccount(false);
+          setRetryScheduled(false);
         }
-      } else {
-        // Success - refresh profile to get new account details
-        await refreshProfile?.();
-        setCreatingAccount(false);
-        retryCountRef.current = 0;
+
+        return;
       }
+
+      // Success - refresh profile to get new account details
+      await refreshProfile();
+      retryCountRef.current = 0;
+      setCreatingAccount(false);
+      setRetryScheduled(false);
     } catch (err) {
       console.error('Error creating virtual account:', err);
-      
+
       if (retryCountRef.current < maxRetries) {
-        setTimeout(() => {
-          setCreatingAccount(false);
-        }, 5000 * retryCountRef.current);
+        const backoffMs = 5000 * retryCountRef.current;
+        setCreatingAccount(false);
+        setRetryScheduled(true);
+
+        retryTimeoutRef.current = window.setTimeout(() => {
+          setRetryScheduled(false);
+          createVirtualAccount();
+        }, backoffMs);
       } else {
         setCreatingAccount(false);
+        setRetryScheduled(false);
       }
     }
   };
@@ -150,7 +183,7 @@ export function AccountCard() {
   };
 
   const hasVirtualAccount = !!profile?.virtual_account_number;
-  const isLoading = !hasVirtualAccount && (creatingAccount || retryCountRef.current < maxRetries);
+  const isLoading = !hasVirtualAccount && (creatingAccount || retryScheduled);
   const displayName = profile?.full_name || 'User';
 
   return (

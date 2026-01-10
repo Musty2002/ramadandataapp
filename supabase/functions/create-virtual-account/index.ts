@@ -6,10 +6,16 @@ const corsHeaders = {
 }
 
 interface BankAccount {
-  bank_name: string
-  bank_code: string
-  account_number: string
-  account_name: string
+  // PaymentPoint can return either snake_case or camelCase keys depending on version
+  bank_name?: string
+  bank_code?: string
+  account_number?: string
+  account_name?: string
+
+  bankName?: string
+  bankCode?: string
+  accountNumber?: string
+  accountName?: string
 }
 
 interface PaymentPointResponse {
@@ -156,13 +162,26 @@ Deno.serve(async (req) => {
     const bankAccount = result.bankAccounts[0]
     console.log('Bank account created:', JSON.stringify(bankAccount))
 
+    // Normalize bank account fields (handle snake_case + camelCase)
+    const accountNumber = (bankAccount as any).account_number ?? (bankAccount as any).accountNumber ?? null
+    const bankName = (bankAccount as any).bank_name ?? (bankAccount as any).bankName ?? null
+    const accountName = (bankAccount as any).account_name ?? (bankAccount as any).accountName ?? null
+
+    if (!accountNumber || !bankName || !accountName) {
+      console.error('Payment Point returned incomplete bank account details:', JSON.stringify(bankAccount))
+      return new Response(
+        JSON.stringify({ error: 'Payment provider returned incomplete bank account details' }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Update profile with virtual account details
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
-        virtual_account_number: bankAccount.account_number,
-        virtual_account_bank: bankAccount.bank_name,
-        virtual_account_name: bankAccount.account_name,
+        virtual_account_number: accountNumber,
+        virtual_account_bank: bankName,
+        virtual_account_name: accountName,
         virtual_account_reference: result.customer?.customer_id || user.id,
       })
       .eq('user_id', user.id)
@@ -182,9 +201,9 @@ Deno.serve(async (req) => {
         success: true,
         message: 'Virtual account created successfully',
         data: {
-          account_number: bankAccount.account_number,
-          account_name: bankAccount.account_name,
-          bank_name: bankAccount.bank_name,
+          account_number: accountNumber,
+          account_name: accountName,
+          bank_name: bankName,
         }
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
