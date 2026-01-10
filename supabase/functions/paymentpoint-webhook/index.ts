@@ -190,11 +190,17 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Create notification
+    // Create notification with fee breakdown
+    const amountPaid = isLegacy ? body.data?.amount : body.amount_paid
+    const settlementFee = isLegacy ? 0 : (body.settlement_fee ?? 0)
+    const feeMessage = settlementFee > 0 
+      ? ` (₦${Number(amountPaid).toLocaleString()} received, ₦${Number(settlementFee).toLocaleString()} fee)`
+      : ''
+    
     await supabase.from('notifications').insert({
       user_id: profile.user_id,
       title: 'Deposit Successful',
-      message: `Your wallet has been credited with ₦${Number(amount).toLocaleString()}`,
+      message: `Your wallet has been credited with ₦${Number(amount).toLocaleString()}${feeMessage}`,
       type: 'success',
     })
 
