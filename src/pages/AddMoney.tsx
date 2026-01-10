@@ -130,37 +130,43 @@ export default function AddMoney() {
               <div className="space-y-4">
                 <div className="bg-secondary/50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Bank Name</p>
-                      <p className="font-semibold text-foreground">
-                        {profile?.virtual_account_bank || 'Palmpay'}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(profile?.virtual_account_bank || 'Palmpay', 'Bank name')}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Bank Name</p>
+                        <p className="font-semibold text-foreground">
+                          {profile?.virtual_account_bank}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={!profile?.virtual_account_bank}
+                        onClick={() =>
+                          copyToClipboard(profile?.virtual_account_bank ?? '', 'Bank name')
+                        }
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                   </div>
                 </div>
 
                 <div className="bg-secondary/50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-                      <p className="font-semibold text-foreground text-lg tracking-wide">
-                        {profile?.virtual_account_number || '----------'}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => copyToClipboard(profile?.virtual_account_number || '', 'Account number')}
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account Number</p>
+                        <p className="font-semibold text-foreground text-lg tracking-wide">
+                          {profile?.virtual_account_number}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={!profile?.virtual_account_number}
+                        onClick={() =>
+                          copyToClipboard(profile?.virtual_account_number ?? '', 'Account number')
+                        }
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
                   </div>
                 </div>
 
