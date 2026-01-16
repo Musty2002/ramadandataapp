@@ -9,11 +9,16 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import mtnLogo from '@/assets/mtn-logo.png';
+import airtelLogo from '@/assets/airtel-logo.jpg';
+import gloLogo from '@/assets/glo-logo.jpg';
+import nineMobileLogo from '@/assets/9mobile-logo.jpg';
+
 const networks = [
-  { id: 'mtn', name: 'MTN', color: 'bg-yellow-400' },
-  { id: 'airtel', name: 'Airtel', color: 'bg-red-500' },
-  { id: 'glo', name: 'Glo', color: 'bg-green-500' },
-  { id: '9mobile', name: '9mobile', color: 'bg-green-700' },
+  { id: 'mtn', name: 'MTN', logo: mtnLogo },
+  { id: 'airtel', name: 'Airtel', logo: airtelLogo },
+  { id: 'glo', name: 'Glo', logo: gloLogo },
+  { id: '9mobile', name: '9mobile', logo: nineMobileLogo },
 ];
 
 interface DataPlan {
@@ -217,11 +222,19 @@ export default function Data() {
                   onClick={() => setSelectedNetwork(network.id)}
                   className={`p-3 rounded-xl border-2 transition-all ${
                     selectedNetwork === network.id
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-card'
+                      ? 'border-primary bg-primary/5 shadow-md'
+                      : 'border-border bg-card hover:border-primary/50'
                   }`}
                 >
-                  <div className={`w-10 h-10 rounded-full ${network.color} mx-auto mb-2`} />
+                  <div className={`w-12 h-12 rounded-full mx-auto mb-2 overflow-hidden shadow-sm ring-2 ring-offset-2 ring-offset-background ${
+                    selectedNetwork === network.id ? 'ring-primary' : 'ring-transparent'
+                  }`}>
+                    <img 
+                      src={network.logo} 
+                      alt={`${network.name} logo`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                   <p className="text-xs font-medium text-center">{network.name}</p>
                 </button>
               ))}
