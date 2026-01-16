@@ -22,12 +22,14 @@ interface DataPlan {
   network: string;
   service_id: number;
   plan_id: number;
+  product_id: string | null;
   name: string;
   display_name: string;
+  data_amount: string | null;
   validity: string | null;
   api_price: number;
   selling_price: number;
-  category: string | null;
+  category: string;
 }
 
 export default function Data() {
@@ -36,27 +38,28 @@ export default function Data() {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [plans, setPlans] = useState<DataPlan[]>([]);
+  const [cheapestPlans, setCheapestPlans] = useState<DataPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('sme');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Fetch plans when network changes
   useEffect(() => {
     if (selectedNetwork) {
-      fetchPlans(selectedNetwork);
+      fetchCheapestPlans(selectedNetwork);
     } else {
-      setPlans([]);
+      setCheapestPlans([]);
       setCategories([]);
+      setSelectedCategory(null);
     }
     setSelectedPlan(null);
   }, [selectedNetwork]);
 
-  const fetchPlans = async (network: string) => {
+  const fetchCheapestPlans = async (network: string) => {
     setLoading(true);
     try {
-      // Use raw query since data_plans table isn't in generated types yet
+      // Fetch all plans for this network from both providers
       const { data, error } = await supabase
         .from('data_plans' as any)
         .select('*')
@@ -66,15 +69,29 @@ export default function Data() {
 
       if (error) throw error;
 
-      const typedData = (data || []) as unknown as DataPlan[];
-      setPlans(typedData);
+      const allPlans = (data || []) as unknown as DataPlan[];
+      
+      // Group by data_amount + category and pick cheapest
+      const cheapestByPlan = new Map<string, DataPlan>();
+      
+      allPlans.forEach(plan => {
+        const key = `${plan.data_amount}-${plan.category}`;
+        const existing = cheapestByPlan.get(key);
+        
+        if (!existing || plan.selling_price < existing.selling_price) {
+          cheapestByPlan.set(key, plan);
+        }
+      });
+
+      const cheapest = Array.from(cheapestByPlan.values());
+      setCheapestPlans(cheapest);
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(typedData.map(p => p.category).filter(Boolean))] as string[];
+      const uniqueCategories = [...new Set(cheapest.map(p => p.category).filter(Boolean))] as string[];
       setCategories(uniqueCategories);
       
       // Set default category
-      if (uniqueCategories.length > 0 && !uniqueCategories.includes(selectedCategory)) {
+      if (uniqueCategories.length > 0) {
         setSelectedCategory(uniqueCategories[0]);
       }
     } catch (error) {
@@ -161,10 +178,11 @@ export default function Data() {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
+      minimumFractionDigits: 0,
     }).format(price);
   };
 
-  const filteredPlans = plans.filter(p => p.category === selectedCategory);
+  const filteredPlans = cheapestPlans.filter(p => p.category === selectedCategory);
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -210,24 +228,11 @@ export default function Data() {
             </div>
           </div>
 
-          {/* Phone Number */}
-          <div className="mb-6">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="08012345678"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              className="mt-2"
-              maxLength={11}
-            />
-          </div>
-
-          {/* Category Tabs */}
+          {/* Category Tabs - Show after network selection */}
           {selectedNetwork && categories.length > 0 && (
-            <div className="mb-4">
-              <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+            <div className="mb-6">
+              <Label className="mb-3 block">Select Category</Label>
+              <Tabs value={selectedCategory || ''} onValueChange={setSelectedCategory}>
                 <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, 1fr)` }}>
                   {categories.map((cat) => (
                     <TabsTrigger key={cat} value={cat} className="text-xs">
@@ -239,50 +244,64 @@ export default function Data() {
             </div>
           )}
 
-          {/* Data Plans */}
-          <div className="mb-6">
-            <Label className="mb-3 block">Select Data Bundle</Label>
-            
-            {loading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Loading plans...</span>
-              </div>
-            ) : !selectedNetwork ? (
-              <p className="text-center text-muted-foreground py-4">
-                Select a network to view available plans
-              </p>
-            ) : filteredPlans.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">
-                No plans available for this category
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredPlans.map((plan) => (
-                  <button
-                    key={plan.id}
-                    onClick={() => setSelectedPlan(plan)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all relative ${
-                      selectedPlan?.id === plan.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border bg-card'
-                    }`}
-                  >
-                    {selectedPlan?.id === plan.id && (
-                      <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </div>
-                    )}
-                    <p className="text-lg font-bold text-foreground">{plan.name}</p>
-                    <p className="text-xs text-muted-foreground">{plan.validity}</p>
-                    <p className="text-sm font-semibold text-primary mt-2">
-                      {formatPrice(plan.selling_price)}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          {/* Data Plans - Show after category selection */}
+          {selectedNetwork && selectedCategory && (
+            <div className="mb-6">
+              <Label className="mb-3 block">Select Data Bundle</Label>
+              
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Loading plans...</span>
+                </div>
+              ) : filteredPlans.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4">
+                  No plans available for this category
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {filteredPlans.map((plan) => (
+                    <button
+                      key={plan.id}
+                      onClick={() => setSelectedPlan(plan)}
+                      className={`p-4 rounded-xl border-2 text-left transition-all relative ${
+                        selectedPlan?.id === plan.id
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card'
+                      }`}
+                    >
+                      {selectedPlan?.id === plan.id && (
+                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                          <Check className="w-3 h-3 text-primary-foreground" />
+                        </div>
+                      )}
+                      <p className="text-lg font-bold text-foreground">{plan.data_amount || plan.name}</p>
+                      <p className="text-xs text-muted-foreground">{plan.validity}</p>
+                      <p className="text-sm font-semibold text-primary mt-2">
+                        {formatPrice(plan.selling_price)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Phone Number - Show after plan selection */}
+          {selectedPlan && (
+            <div className="mb-6">
+              <Label htmlFor="phone">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="08012345678"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="mt-2"
+                maxLength={11}
+              />
+            </div>
+          )}
 
           {/* Selected Plan Summary */}
           {selectedPlan && (

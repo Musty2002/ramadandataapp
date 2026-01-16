@@ -14,6 +14,123 @@ export type Database = {
   }
   public: {
     Tables: {
+      airtime_plans: {
+        Row: {
+          created_at: string
+          discount_percent: number
+          id: string
+          is_active: boolean
+          max_amount: number
+          min_amount: number
+          network: string
+          provider: string
+        }
+        Insert: {
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          max_amount?: number
+          min_amount?: number
+          network: string
+          provider: string
+        }
+        Update: {
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          max_amount?: number
+          min_amount?: number
+          network?: string
+          provider?: string
+        }
+        Relationships: []
+      }
+      api_providers: {
+        Row: {
+          base_url: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+        }
+        Insert: {
+          base_url: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+        }
+        Update: {
+          base_url?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+        }
+        Relationships: []
+      }
+      data_plans: {
+        Row: {
+          api_price: number
+          category: string
+          created_at: string
+          data_amount: string | null
+          display_name: string
+          id: string
+          is_active: boolean
+          name: string
+          network: string
+          plan_id: number | null
+          product_id: string | null
+          provider: string
+          selling_price: number
+          service_id: number | null
+          updated_at: string
+          validity: string | null
+        }
+        Insert: {
+          api_price: number
+          category?: string
+          created_at?: string
+          data_amount?: string | null
+          display_name: string
+          id?: string
+          is_active?: boolean
+          name: string
+          network: string
+          plan_id?: number | null
+          product_id?: string | null
+          provider: string
+          selling_price: number
+          service_id?: number | null
+          updated_at?: string
+          validity?: string | null
+        }
+        Update: {
+          api_price?: number
+          category?: string
+          created_at?: string
+          data_amount?: string | null
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          network?: string
+          plan_id?: number | null
+          product_id?: string | null
+          provider?: string
+          selling_price?: number
+          service_id?: number | null
+          updated_at?: string
+          validity?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           created_at: string
