@@ -5,3 +5,12 @@ verify_jwt = false
 
 [functions.paymentpoint-webhook]
 verify_jwt = false
+
+[functions.buy-data]
+verify_jwt = false
+
+[functions.buy-airtime]
+verify_jwt = false
+
+[functions.data-webhook]
+verify_jwt = false
