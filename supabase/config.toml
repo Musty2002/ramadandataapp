@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.data-webhook]
 verify_jwt = false
+
+[functions.buy-electricity]
+verify_jwt = false
+
+[functions.buy-cable]
+verify_jwt = false
+
+[functions.buy-exam-pin]
+verify_jwt = false

@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 const services = [
   { icon: Wifi, label: 'Data', path: '/data' },
   { icon: Phone, label: 'Airtime', path: '/airtime' },
-  { icon: CreditCard, label: 'Data Card', path: '/data-card' },
+  { icon: CreditCard, label: 'Exam Pins', path: '/exam-pins' },
   { icon: Zap, label: 'Electricity', path: '/electricity' },
   { icon: Tv, label: 'TV Sub', path: '/tv' },
   { icon: Banknote, label: 'Airtime to Cash', path: '/airtime-to-cash' },

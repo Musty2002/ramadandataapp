@@ -74,6 +74,66 @@ export type Database = {
         }
         Relationships: []
       }
+      cable_bouquets: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          plan_id: number
+          price: number
+          provider_code: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          plan_id: number
+          price: number
+          provider_code: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          plan_id?: number
+          price?: number
+          provider_code?: string
+        }
+        Relationships: []
+      }
+      cable_providers: {
+        Row: {
+          code: string
+          created_at: string
+          discount_percent: number
+          id: string
+          is_active: boolean
+          name: string
+          service_id: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          service_id: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          service_id?: number
+        }
+        Relationships: []
+      }
       data_plans: {
         Row: {
           api_price: number
@@ -128,6 +188,66 @@ export type Database = {
           service_id?: number | null
           updated_at?: string
           validity?: string | null
+        }
+        Relationships: []
+      }
+      electricity_providers: {
+        Row: {
+          code: string
+          created_at: string
+          discount_percent: number
+          id: string
+          is_active: boolean
+          name: string
+          service_id: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          name: string
+          service_id: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_percent?: number
+          id?: string
+          is_active?: boolean
+          name?: string
+          service_id?: number
+        }
+        Relationships: []
+      }
+      exam_pins: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          price: number
+          service_id: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          price: number
+          service_id: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          price?: number
+          service_id?: number
         }
         Relationships: []
       }
@@ -378,6 +498,8 @@ export type Database = {
         | "tv"
         | "transfer"
         | "referral_bonus"
+        | "cable"
+        | "exam"
       transaction_status: "pending" | "completed" | "failed"
       transaction_type: "credit" | "debit"
     }
@@ -517,6 +639,8 @@ export const Constants = {
         "tv",
         "transfer",
         "referral_bonus",
+        "cable",
+        "exam",
       ],
       transaction_status: ["pending", "completed", "failed"],
       transaction_type: ["credit", "debit"],
