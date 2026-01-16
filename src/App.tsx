@@ -22,6 +22,7 @@ import BvnNin from "./pages/BvnNin";
 import Notifications from "./pages/Notifications";
 import Website from "./pages/Website";
 import NotFound from "./pages/NotFound";
+import ExamPins from "./pages/ExamPins";
 
 const queryClient = new QueryClient();
 
@@ -175,6 +176,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Notifications />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exam-pins"
+        element={
+          <ProtectedRoute>
+            <ExamPins />
           </ProtectedRoute>
         }
       />
