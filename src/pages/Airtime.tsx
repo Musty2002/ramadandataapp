@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const networks = [
   { id: 'mtn', name: 'MTN', color: 'bg-yellow-400' },
@@ -16,14 +17,57 @@ const networks = [
 
 const quickAmounts = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
+interface AirtimePlan {
+  id: string;
+  provider: string;
+  network: string;
+  discount_percent: number;
+  min_amount: number;
+  max_amount: number;
+}
+
 export default function Airtime() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [amount, setAmount] = useState('');
+  const [purchasing, setPurchasing] = useState(false);
+  const [bestPlan, setBestPlan] = useState<AirtimePlan | null>(null);
 
-  const handlePurchase = () => {
+  // Fetch best airtime plan when network changes
+  useEffect(() => {
+    if (selectedNetwork) {
+      fetchBestAirtimePlan(selectedNetwork);
+    } else {
+      setBestPlan(null);
+    }
+  }, [selectedNetwork]);
+
+  const fetchBestAirtimePlan = async (network: string) => {
+    try {
+      // Fetch all airtime plans for this network from both providers
+      const { data, error } = await supabase
+        .from('airtime_plans' as any)
+        .select('*')
+        .eq('network', network)
+        .eq('is_active', true)
+        .order('discount_percent', { ascending: false });
+
+      if (error) throw error;
+
+      const plans = (data || []) as unknown as AirtimePlan[];
+      
+      // Pick the plan with the highest discount (cheapest for user)
+      if (plans.length > 0) {
+        setBestPlan(plans[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching airtime plans:', error);
+    }
+  };
+
+  const handlePurchase = async () => {
     if (!selectedNetwork || !phoneNumber || !amount) {
       toast({
         variant: 'destructive',
@@ -33,10 +77,73 @@ export default function Airtime() {
       return;
     }
 
-    toast({
-      title: 'Coming Soon',
-      description: 'Airtime purchase will be available soon',
-    });
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum < 50) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Amount',
+        description: 'Minimum airtime amount is ₦50',
+      });
+      return;
+    }
+
+    // Validate phone number
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    if (cleanPhone.length !== 11) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Phone Number',
+        description: 'Please enter a valid 11-digit phone number',
+      });
+      return;
+    }
+
+    setPurchasing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          variant: 'destructive',
+          title: 'Not Logged In',
+          description: 'Please log in to purchase airtime',
+        });
+        navigate('/auth');
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('buy-airtime', {
+        body: {
+          network: selectedNetwork,
+          phone_number: cleanPhone,
+          amount: amountNum,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: 'Success',
+          description: data.message,
+        });
+        // Reset form
+        setPhoneNumber('');
+        setAmount('');
+        navigate('/history');
+      } else {
+        throw new Error(data?.error || 'Purchase failed');
+      }
+    } catch (error: unknown) {
+      console.error('Purchase error:', error);
+      const message = error instanceof Error ? error.message : 'Failed to purchase airtime. Please try again.';
+      toast({
+        variant: 'destructive',
+        title: 'Purchase Failed',
+        description: message,
+      });
+    } finally {
+      setPurchasing(false);
+    }
   };
 
   const formatPrice = (price: number) => {
@@ -46,6 +153,14 @@ export default function Airtime() {
       minimumFractionDigits: 0,
     }).format(price);
   };
+
+  // Calculate discounted price
+  const getDiscountedPrice = (amt: number) => {
+    if (!bestPlan) return amt;
+    return amt * (1 - bestPlan.discount_percent / 100);
+  };
+
+  const amountNum = parseFloat(amount) || 0;
 
   return (
     <MobileLayout showNav={false}>
@@ -90,6 +205,7 @@ export default function Airtime() {
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
               className="mt-2"
+              maxLength={11}
             />
           </div>
 
@@ -103,6 +219,8 @@ export default function Airtime() {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="mt-2"
+              min={50}
+              max={50000}
             />
           </div>
 
@@ -125,14 +243,41 @@ export default function Airtime() {
             </div>
           </div>
 
+          {/* Price Summary with Discount */}
+          {amountNum > 0 && bestPlan && (
+            <div className="mb-4 p-4 rounded-xl bg-muted/50 border border-border">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-muted-foreground">Airtime Value</span>
+                <span className="font-medium">{formatPrice(amountNum)}</span>
+              </div>
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-muted-foreground">Discount ({bestPlan.discount_percent}%)</span>
+                <span className="font-medium text-green-600">-{formatPrice(amountNum * bestPlan.discount_percent / 100)}</span>
+              </div>
+              <div className="border-t border-border pt-2 mt-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">You Pay</span>
+                  <span className="text-lg font-bold text-primary">{formatPrice(getDiscountedPrice(amountNum))}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Purchase Button */}
           <Button
             className="w-full"
             size="lg"
             onClick={handlePurchase}
-            disabled={!selectedNetwork || !phoneNumber || !amount}
+            disabled={!selectedNetwork || !phoneNumber || !amount || purchasing}
           >
-            Buy Airtime
+            {purchasing ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              'Buy Airtime'
+            )}
           </Button>
         </div>
       </div>

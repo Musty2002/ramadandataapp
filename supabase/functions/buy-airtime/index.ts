@@ -72,17 +72,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Get airtime plan for discount info
-    const { data: airtimePlan, error: planError } = await supabase
+    // Get best airtime plan (highest discount = cheapest for user)
+    const { data: airtimePlans, error: planError } = await supabase
       .from('airtime_plans')
       .select('*')
       .eq('network', network.toLowerCase())
       .eq('is_active', true)
-      .maybeSingle()
+      .order('discount_percent', { ascending: false })
 
-    const discountPercent = airtimePlan?.discount_percent || 0
+    // Pick the plan with highest discount (best for user)
+    const bestPlan = airtimePlans && airtimePlans.length > 0 ? airtimePlans[0] : null
+    const discountPercent = bestPlan?.discount_percent || 0
+    const selectedProvider = bestPlan?.provider || 'isquare'
     const discountAmount = (amount * discountPercent) / 100
     const chargeAmount = amount - discountAmount // User pays less due to discount
+
+    console.log('Selected provider for airtime:', { provider: selectedProvider, discount: discountPercent })
 
     // Get user's wallet
     const { data: wallet, error: walletError } = await supabase
@@ -128,7 +133,7 @@ Deno.serve(async (req) => {
           charge_amount: chargeAmount,
           discount_percent: discountPercent,
           discount_amount: discountAmount,
-          provider: 'isquare'
+          provider: selectedProvider
         }
       })
       .select()
@@ -142,8 +147,13 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Call the iSquare airtime API
-    const apiResponse = await callIsquareAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
+    // Call the appropriate airtime API based on best provider
+    let apiResponse
+    if (selectedProvider === 'rgc') {
+      apiResponse = await callRgcAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
+    } else {
+      apiResponse = await callIsquareAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
+    }
 
     if (apiResponse?.error) {
       console.error('API error:', apiResponse.error)
@@ -302,6 +312,65 @@ async function callIsquareAirtimeAPI(network: string, phoneNumber: string, amoun
     }
   } catch (error: unknown) {
     console.error('iSquare Airtime API call error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { error: `API call failed: ${message}` }
+  }
+}
+
+async function callRgcAirtimeAPI(network: string, phoneNumber: string, amount: number, reference: string) {
+  try {
+    const apiKey = Deno.env.get('RGC_API_KEY')
+
+    if (!apiKey) {
+      return { error: 'RGC API key not configured' }
+    }
+
+    // Map network to RGC network code
+    const networkMap: Record<string, string> = {
+      'mtn': 'mtn',
+      'airtel': 'airtel',
+      'glo': 'glo',
+      '9mobile': '9mobile'
+    }
+
+    const networkCode = networkMap[network]
+    if (!networkCode) {
+      return { error: 'Invalid network' }
+    }
+
+    console.log('Calling RGC Airtime API:', { network: networkCode, phone: phoneNumber, amount })
+
+    const response = await fetch('https://rgc.ng/api/airtime/buy', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        network: networkCode,
+        amount: amount,
+        phone: phoneNumber,
+        reference: reference
+      })
+    })
+
+    const data = await response.json()
+    console.log('RGC Airtime API response:', data)
+
+    if (!response.ok || data.error || data.status === 'error') {
+      return { 
+        error: data.message || data.error || 'RGC API error',
+        raw: data
+      }
+    }
+
+    return {
+      status: data.status === 'success' ? 'success' : 'pending',
+      transaction_id: data.transaction_id || data.id,
+      raw: data
+    }
+  } catch (error: unknown) {
+    console.error('RGC Airtime API call error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { error: `API call failed: ${message}` }
   }
