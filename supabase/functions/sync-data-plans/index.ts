@@ -24,36 +24,12 @@ const ISQUARE_SERVICES: Record<string, { id: number; name: string; category: str
   ],
 }
 
-// RGC network IDs mapping
-const RGC_NETWORKS: Record<string, number> = {
-  mtn: 1,
-  airtel: 2,
-  glo: 3,
-  '9mobile': 4,
-}
-
-// RGC category mappings
-const RGC_CATEGORIES: Record<string, { id: number; name: string; category: string }[]> = {
-  mtn: [
-    { id: 1, name: 'SME', category: 'sme' },
-    { id: 2, name: 'Gifting', category: 'gifting' },
-    { id: 3, name: 'Corporate', category: 'corporate' },
-  ],
-  airtel: [
-    { id: 1, name: 'SME', category: 'sme' },
-    { id: 2, name: 'Gifting', category: 'gifting' },
-    { id: 3, name: 'Corporate', category: 'corporate' },
-  ],
-  glo: [
-    { id: 1, name: 'SME', category: 'sme' },
-    { id: 2, name: 'Gifting', category: 'gifting' },
-    { id: 3, name: 'Corporate', category: 'corporate' },
-  ],
-  '9mobile': [
-    { id: 1, name: 'SME', category: 'sme' },
-    { id: 2, name: 'Gifting', category: 'gifting' },
-    { id: 3, name: 'Corporate', category: 'corporate' },
-  ],
+// RGC category mappings - derived from API response categories
+// Categories from API: "MTN SME", "MTN SME II", "MTN CG", "MTN DATA SHARE", "GLO", "AIRTEL CG", "9mobile"
+const RGC_CATEGORY_MAP: Record<string, string[]> = {
+  sme: ['SME', 'SME II'],
+  corporate: ['CG', 'DATA SHARE'],
+  gifting: [''], // Direct network name like "GLO", "9mobile"
 }
 
 let currentNetwork = 'mtn'
@@ -131,13 +107,74 @@ async function fetchIsquarePlans(categoryId: string): Promise<any[]> {
   }
 }
 
-// RGC functions
+// RGC functions - fetch categories dynamically from API
 async function fetchRgcCategories(): Promise<{ id: string; name: string; service_id?: number }[]> {
-  const categories = RGC_CATEGORIES[currentNetwork] || []
-  return categories.map(c => ({
-    id: c.category,
-    name: c.name,
-  }))
+  const apiKey = Deno.env.get('RGC_API_KEY')
+  if (!apiKey) {
+    throw new Error('RGC API key not configured')
+  }
+
+  try {
+    const response = await fetch(`https://api.rgcdata.com.ng/api/v2/services/data`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error(`Failed to fetch RGC categories: ${response.status}`)
+      return []
+    }
+
+    const data = await response.json()
+    
+    if (!data.success || !Array.isArray(data.data)) {
+      return []
+    }
+
+    // Extract unique categories for the current network
+    const networkUpper = currentNetwork.toUpperCase()
+    const networkCategories = new Map<string, string>()
+    
+    for (const plan of data.data) {
+      const category = plan.category || ''
+      // Check if category belongs to current network
+      if (category.toUpperCase().includes(networkUpper) || 
+          (currentNetwork === '9mobile' && category.toLowerCase().includes('9mobile'))) {
+        // Extract category type (SME, CG, etc.)
+        let categoryId = 'gifting'
+        let categoryName = 'Gifting'
+        
+        if (category.toUpperCase().includes('SME II')) {
+          categoryId = 'sme2'
+          categoryName = 'SME II'
+        } else if (category.toUpperCase().includes('SME')) {
+          categoryId = 'sme'
+          categoryName = 'SME'
+        } else if (category.toUpperCase().includes('CG')) {
+          categoryId = 'corporate'
+          categoryName = 'Corporate'
+        } else if (category.toUpperCase().includes('DATA SHARE')) {
+          categoryId = 'datashare'
+          categoryName = 'Data Share'
+        }
+        
+        if (!networkCategories.has(categoryId)) {
+          networkCategories.set(categoryId, categoryName)
+        }
+      }
+    }
+
+    return Array.from(networkCategories.entries()).map(([id, name]) => ({
+      id,
+      name,
+    }))
+  } catch (error) {
+    console.error('Error fetching RGC categories:', error)
+    return []
+  }
 }
 
 async function fetchRgcPlans(categoryId: string): Promise<any[]> {
@@ -146,17 +183,11 @@ async function fetchRgcPlans(categoryId: string): Promise<any[]> {
   if (!apiKey) {
     throw new Error('RGC API key not configured')
   }
-
-  const networkId = RGC_NETWORKS[currentNetwork]
-  if (!networkId) {
-    return []
-  }
   
   try {
-    console.log(`Fetching RGC plans for network ${currentNetwork} (${networkId}), category ${categoryId}...`)
+    console.log(`Fetching RGC plans for network ${currentNetwork}, category ${categoryId}...`)
     
-    // RGC API endpoint to get data plans
-    const response = await fetch(`https://api.rgcdata.com.ng/api/v2/internet/data`, {
+    const response = await fetch(`https://api.rgcdata.com.ng/api/v2/services/data`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -174,56 +205,45 @@ async function fetchRgcPlans(categoryId: string): Promise<any[]> {
     const data = await response.json()
     console.log(`RGC plans response:`, JSON.stringify(data).slice(0, 1000))
 
-    // RGC returns data in various formats, handle accordingly
-    let allPlans = []
-    
-    if (data.success && data.data) {
-      // Handle nested structure
-      if (Array.isArray(data.data)) {
-        allPlans = data.data
-      } else if (typeof data.data === 'object') {
-        // May have network-specific data
-        const networkName = currentNetwork.toUpperCase()
-        if (data.data[networkName]) {
-          allPlans = data.data[networkName]
-        } else if (data.data[currentNetwork]) {
-          allPlans = data.data[currentNetwork]
-        } else {
-          // Flatten all arrays in the object
-          allPlans = Object.values(data.data).flat()
-        }
-      }
-    } else if (Array.isArray(data)) {
-      allPlans = data
+    if (!data.success || !Array.isArray(data.data)) {
+      return []
     }
 
+    const networkUpper = currentNetwork.toUpperCase()
+    
     // Filter plans by network and category
-    const filteredPlans = allPlans.filter((plan: any) => {
-      const planNetwork = (plan.network || plan.network_name || '').toLowerCase()
-      const planCategory = (plan.type || plan.category || plan.plan_type || 'gifting').toLowerCase()
+    const filteredPlans = data.data.filter((plan: any) => {
+      const planCategory = (plan.category || '').toUpperCase()
       
-      // Match network
-      const networkMatch = planNetwork === currentNetwork || 
-                          planNetwork.includes(currentNetwork) ||
-                          plan.network_id === networkId
-
-      // Match category
-      const categoryMatch = planCategory === categoryId ||
-                           planCategory.includes(categoryId) ||
-                           (categoryId === 'sme' && planCategory.includes('sme')) ||
-                           (categoryId === 'gifting' && (planCategory.includes('gift') || planCategory.includes('normal'))) ||
-                           (categoryId === 'corporate' && planCategory.includes('corporate'))
-
-      return networkMatch && categoryMatch
+      // Check network match
+      const networkMatch = planCategory.includes(networkUpper) || 
+                          (currentNetwork === '9mobile' && planCategory.toLowerCase().includes('9mobile'))
+      
+      if (!networkMatch) return false
+      
+      // Check category match
+      if (categoryId === 'sme2') {
+        return planCategory.includes('SME II')
+      } else if (categoryId === 'sme') {
+        return planCategory.includes('SME') && !planCategory.includes('SME II')
+      } else if (categoryId === 'corporate') {
+        return planCategory.includes('CG')
+      } else if (categoryId === 'datashare') {
+        return planCategory.includes('DATA SHARE')
+      } else if (categoryId === 'gifting') {
+        // Gifting = direct network name without SME/CG/DATA SHARE
+        return !planCategory.includes('SME') && !planCategory.includes('CG') && !planCategory.includes('DATA SHARE')
+      }
+      
+      return false
     })
 
-    console.log(`Filtered ${filteredPlans.length} plans for ${currentNetwork}/${categoryId}`)
+    console.log(`Filtered ${filteredPlans.length} RGC plans for ${currentNetwork}/${categoryId}`)
 
     return filteredPlans.map((plan: any) => {
-      const planName = plan.name || plan.plan_name || plan.description || ''
-      const dataAmount = extractDataAmount(planName) || plan.size || plan.data_amount || ''
-      const validity = extractValidity(planName) || plan.validity || plan.duration || 'Monthly'
-      const price = parseFloat(plan.price || plan.amount || plan.cost || 0)
+      const planName = plan.name || ''
+      const dataAmount = planName.trim()
+      const price = parseFloat(plan.amount || 0)
       
       return {
         provider: 'rgc',
@@ -231,11 +251,11 @@ async function fetchRgcPlans(categoryId: string): Promise<any[]> {
         category: categoryId,
         service_id: null,
         plan_id: null,
-        product_id: plan.id || plan.product_id || plan.plan_id,
-        name: planName,
-        display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
+        product_id: String(plan.product_id || plan.id),
+        name: `${plan.category} - ${planName}`,
+        display_name: `${currentNetwork.toUpperCase()} ${dataAmount}`.trim(),
         data_amount: dataAmount,
-        validity: validity,
+        validity: 'Monthly',
         api_price: price
       }
     })
