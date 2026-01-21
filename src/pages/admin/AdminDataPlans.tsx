@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,42 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Download, Loader2, Save, Check, X } from 'lucide-react';
+import { Download, Loader2, Plus, Trash2, RefreshCw, Database, Cloud } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+
+interface DbPlan {
+  id: string;
+  provider: string;
+  network: string;
+  category: string;
+  service_id: number | null;
+  plan_id: number | null;
+  product_id: string | null;
+  name: string;
+  display_name: string;
+  data_amount: string | null;
+  validity: string | null;
+  api_price: number;
+  selling_price: number;
+  is_active: boolean;
+}
 
 interface ApiPlan {
   provider: string;
@@ -17,6 +50,7 @@ interface ApiPlan {
   category: string;
   service_id: number;
   plan_id: number;
+  product_id?: string;
   name: string;
   display_name: string;
   data_amount: string;
@@ -24,7 +58,6 @@ interface ApiPlan {
   api_price: number;
   selling_price: number;
   is_active: boolean;
-  db_id: string | null;
   in_database: boolean;
 }
 
@@ -41,22 +74,142 @@ const PROVIDERS = [
 ];
 
 export default function AdminDataPlans() {
+  const [activeTab, setActiveTab] = useState('database');
+  
+  // Database plans state
+  const [dbPlans, setDbPlans] = useState<DbPlan[]>([]);
+  const [loadingDbPlans, setLoadingDbPlans] = useState(false);
+  const [selectedDbNetwork, setSelectedDbNetwork] = useState<string>('all');
+  const [editingPlan, setEditingPlan] = useState<DbPlan | null>(null);
+  const [savingPlan, setSavingPlan] = useState(false);
+  
+  // API fetch state
   const [selectedNetwork, setSelectedNetwork] = useState<string>('mtn');
   const [selectedProvider, setSelectedProvider] = useState<string>('isquare');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [categories, setCategories] = useState<Category[]>([]);
-  const [plans, setPlans] = useState<ApiPlan[]>([]);
-  const [editedPlans, setEditedPlans] = useState<Record<string, Partial<ApiPlan>>>({});
+  const [apiPlans, setApiPlans] = useState<ApiPlan[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
-  const [loadingPlans, setLoadingPlans] = useState(false);
-  const [savingPlan, setSavingPlan] = useState<string | null>(null);
+  const [loadingApiPlans, setLoadingApiPlans] = useState(false);
+  const [addingPlan, setAddingPlan] = useState<string | null>(null);
+  
   const { toast } = useToast();
 
+  // Fetch database plans
+  const fetchDbPlans = async () => {
+    setLoadingDbPlans(true);
+    try {
+      const { data, error } = await supabase
+        .from('data_plans')
+        .select('*')
+        .order('network')
+        .order('selling_price');
+
+      if (error) throw error;
+      setDbPlans(data || []);
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to fetch plans',
+      });
+    } finally {
+      setLoadingDbPlans(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDbPlans();
+  }, []);
+
+  // Filter database plans
+  const filteredDbPlans = selectedDbNetwork === 'all' 
+    ? dbPlans 
+    : dbPlans.filter(p => p.network === selectedDbNetwork);
+
+  // Update plan in database
+  const updatePlan = async () => {
+    if (!editingPlan) return;
+    setSavingPlan(true);
+    try {
+      const { error } = await supabase
+        .from('data_plans')
+        .update({
+          selling_price: editingPlan.selling_price,
+          is_active: editingPlan.is_active,
+          display_name: editingPlan.display_name,
+        })
+        .eq('id', editingPlan.id);
+
+      if (error) throw error;
+
+      setDbPlans(prev => prev.map(p => 
+        p.id === editingPlan.id ? editingPlan : p
+      ));
+      setEditingPlan(null);
+      toast({ title: 'Plan updated successfully' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update plan',
+      });
+    } finally {
+      setSavingPlan(false);
+    }
+  };
+
+  // Delete plan from database
+  const deletePlan = async (planId: string) => {
+    if (!confirm('Are you sure you want to delete this plan?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('data_plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) throw error;
+
+      setDbPlans(prev => prev.filter(p => p.id !== planId));
+      toast({ title: 'Plan deleted' });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to delete plan',
+      });
+    }
+  };
+
+  // Toggle plan active status quickly
+  const togglePlanStatus = async (plan: DbPlan) => {
+    try {
+      const { error } = await supabase
+        .from('data_plans')
+        .update({ is_active: !plan.is_active })
+        .eq('id', plan.id);
+
+      if (error) throw error;
+
+      setDbPlans(prev => prev.map(p => 
+        p.id === plan.id ? { ...p, is_active: !p.is_active } : p
+      ));
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to update status',
+      });
+    }
+  };
+
+  // Fetch categories from API
   const fetchCategories = async () => {
     setLoadingCategories(true);
     setCategories([]);
     setSelectedCategory('');
-    setPlans([]);
+    setApiPlans([]);
     
     try {
       const { data, error } = await supabase.functions.invoke('sync-data-plans', {
@@ -73,11 +226,10 @@ export default function AdminDataPlans() {
         setCategories(data.categories);
         toast({
           title: 'Categories Loaded',
-          description: `Found ${data.categories.length} categories for ${selectedNetwork.toUpperCase()}`,
+          description: `Found ${data.categories.length} categories`,
         });
       }
     } catch (error: any) {
-      console.error('Fetch categories error:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
@@ -88,12 +240,12 @@ export default function AdminDataPlans() {
     }
   };
 
-  const fetchPlans = async () => {
+  // Fetch plans from API
+  const fetchApiPlans = async () => {
     if (!selectedCategory) return;
     
-    setLoadingPlans(true);
-    setPlans([]);
-    setEditedPlans({});
+    setLoadingApiPlans(true);
+    setApiPlans([]);
     
     try {
       const { data, error } = await supabase.functions.invoke('sync-data-plans', {
@@ -108,115 +260,62 @@ export default function AdminDataPlans() {
       if (error) throw error;
 
       if (data?.plans) {
-        setPlans(data.plans);
+        setApiPlans(data.plans);
         toast({
           title: 'Plans Fetched',
-          description: `Found ${data.plans.length} plans from API`,
+          description: `Found ${data.plans.length} plans`,
         });
       }
     } catch (error: any) {
-      console.error('Fetch plans error:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
         description: error.message || 'Failed to fetch plans',
       });
     } finally {
-      setLoadingPlans(false);
+      setLoadingApiPlans(false);
     }
   };
 
-  const handlePriceChange = (planKey: string, value: string) => {
-    const plan = plans.find(p => `${p.service_id}-${p.plan_id}` === planKey);
-    if (!plan) return;
-
-    setEditedPlans(prev => ({
-      ...prev,
-      [planKey]: {
-        ...prev[planKey],
-        selling_price: parseFloat(value) || 0,
-      }
-    }));
-  };
-
-  const handleStatusChange = (planKey: string, value: boolean) => {
-    setEditedPlans(prev => ({
-      ...prev,
-      [planKey]: {
-        ...prev[planKey],
-        is_active: value,
-      }
-    }));
-  };
-
-  const savePlan = async (plan: ApiPlan) => {
+  // Add plan to database with custom price
+  const addPlanToDatabase = async (plan: ApiPlan, customPrice: number) => {
     const planKey = `${plan.service_id}-${plan.plan_id}`;
-    const edits = editedPlans[planKey];
+    setAddingPlan(planKey);
     
-    setSavingPlan(planKey);
     try {
-      const updatedPlan = {
-        ...plan,
-        selling_price: edits?.selling_price ?? plan.selling_price,
-        is_active: edits?.is_active ?? plan.is_active,
-      };
-
       const { data, error } = await supabase.functions.invoke('sync-data-plans', {
         body: { 
           action: 'save-plan',
-          plan: updatedPlan
+          plan: {
+            ...plan,
+            selling_price: customPrice,
+            is_active: true,
+          }
         }
       });
 
       if (error) throw error;
 
-      // Update local state
-      setPlans(prev => prev.map(p => {
-        if (`${p.service_id}-${p.plan_id}` === planKey) {
-          return {
-            ...p,
-            ...updatedPlan,
-            db_id: data.plan_id || p.db_id,
-            in_database: true,
-          };
-        }
-        return p;
-      }));
+      // Refresh database plans
+      await fetchDbPlans();
+      
+      // Mark as in database
+      setApiPlans(prev => prev.map(p => 
+        `${p.service_id}-${p.plan_id}` === planKey 
+          ? { ...p, in_database: true }
+          : p
+      ));
 
-      // Clear edits for this plan
-      setEditedPlans(prev => {
-        const { [planKey]: _, ...rest } = prev;
-        return rest;
-      });
-
-      toast({
-        title: 'Saved',
-        description: `${plan.display_name} ${plan.in_database ? 'updated' : 'added to database'}`,
-      });
+      toast({ title: 'Plan added to database' });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to save plan',
+        description: error.message || 'Failed to add plan',
       });
     } finally {
-      setSavingPlan(null);
+      setAddingPlan(null);
     }
-  };
-
-  const getDisplayValue = (plan: ApiPlan, field: 'selling_price' | 'is_active') => {
-    const planKey = `${plan.service_id}-${plan.plan_id}`;
-    const edits = editedPlans[planKey];
-    
-    if (edits && edits[field] !== undefined) {
-      return edits[field];
-    }
-    return plan[field];
-  };
-
-  const hasChanges = (plan: ApiPlan) => {
-    const planKey = `${plan.service_id}-${plan.plan_id}`;
-    return !!editedPlans[planKey];
   };
 
   return (
@@ -225,240 +324,400 @@ export default function AdminDataPlans() {
         <div>
           <h1 className="text-2xl font-bold">Data Plans</h1>
           <p className="text-muted-foreground">
-            Fetch live plans from API providers and manage pricing
+            Manage your data plans and pricing
           </p>
         </div>
 
-        {/* Step 1: Network Selection */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">1</span>
-              Select Network
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-4 gap-3">
-              {NETWORKS.map((network) => (
-                <Button
-                  key={network}
-                  variant={selectedNetwork === network ? 'default' : 'outline'}
-                  className="w-full"
-                  onClick={() => {
-                    setSelectedNetwork(network);
-                    setCategories([]);
-                    setSelectedCategory('');
-                    setPlans([]);
-                  }}
-                >
-                  {network.toUpperCase()}
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="database" className="gap-2">
+              <Database className="h-4 w-4" />
+              My Plans ({dbPlans.length})
+            </TabsTrigger>
+            <TabsTrigger value="api" className="gap-2">
+              <Cloud className="h-4 w-4" />
+              Add from API
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Step 2: Provider Selection */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">2</span>
-              Select API Provider
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-4">
-              <div className="flex-1">
-                <Select value={selectedProvider} onValueChange={(v) => {
-                  setSelectedProvider(v);
-                  setCategories([]);
-                  setSelectedCategory('');
-                  setPlans([]);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PROVIDERS.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={fetchCategories} disabled={loadingCategories}>
-                {loadingCategories ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Download className="h-4 w-4 mr-2" />
-                )}
-                Load Categories
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Step 3: Category Selection */}
-        {categories.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">3</span>
-                Select Category
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-end gap-4">
-                <div className="flex-1">
-                  <Select value={selectedCategory} onValueChange={(v) => {
-                    setSelectedCategory(v);
-                    setPlans([]);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name} {cat.service_id ? `(Service ID: ${cat.service_id})` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          {/* Database Plans Tab */}
+          <TabsContent value="database" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base">Active Plans</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedDbNetwork} onValueChange={setSelectedDbNetwork}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Networks</SelectItem>
+                        {NETWORKS.map(n => (
+                          <SelectItem key={n} value={n}>{n.toUpperCase()}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button variant="outline" size="icon" onClick={fetchDbPlans} disabled={loadingDbPlans}>
+                      <RefreshCw className={`h-4 w-4 ${loadingDbPlans ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
                 </div>
-                <Button onClick={fetchPlans} disabled={!selectedCategory || loadingPlans}>
-                  {loadingPlans ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4 mr-2" />
-                  )}
-                  Fetch Plans
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardHeader>
+              <CardContent>
+                {loadingDbPlans ? (
+                  <div className="py-8 text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : filteredDbPlans.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">
+                    <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No plans in database</p>
+                    <p className="text-sm">Go to "Add from API" tab to fetch and add plans</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Network</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Validity</TableHead>
+                          <TableHead className="text-right">API Price</TableHead>
+                          <TableHead className="text-right">Your Price</TableHead>
+                          <TableHead className="text-right">Margin</TableHead>
+                          <TableHead className="text-center">Active</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredDbPlans.map((plan) => {
+                          const margin = plan.selling_price - plan.api_price;
+                          return (
+                            <TableRow key={plan.id} className={!plan.is_active ? 'opacity-50' : ''}>
+                              <TableCell>
+                                <Badge variant="outline" className="uppercase">
+                                  {plan.network}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{plan.data_amount || plan.name}</p>
+                                  <p className="text-xs text-muted-foreground">{plan.category}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {plan.validity || '-'}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                ₦{plan.api_price.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right font-mono font-medium">
+                                ₦{plan.selling_price.toLocaleString()}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={`font-mono text-sm ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  ₦{margin.toLocaleString()}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <Switch
+                                  checked={plan.is_active}
+                                  onCheckedChange={() => togglePlanStatus(plan)}
+                                />
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditingPlan(plan)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    onClick={() => deletePlan(plan.id)}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        {/* Step 4: Plans Management */}
-        {plans.length > 0 && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm">4</span>
-                Manage Plans
-              </CardTitle>
-              <CardDescription>
-                Toggle plans on/off and set your app prices. Changes are saved individually.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {plans.map((plan) => {
-                  const planKey = `${plan.service_id}-${plan.plan_id}`;
-                  const sellingPrice = getDisplayValue(plan, 'selling_price') as number;
-                  const isActive = getDisplayValue(plan, 'is_active') as boolean;
-                  const margin = sellingPrice - plan.api_price;
-                  const changed = hasChanges(plan);
-                  
-                  return (
-                    <div
-                      key={planKey}
-                      className={`p-4 rounded-xl border-2 transition-all ${
-                        changed ? 'border-primary bg-primary/5' : 'border-border bg-card'
-                      } ${!isActive ? 'opacity-60' : ''}`}
-                    >
-                      {/* Plan Header */}
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h3 className="font-semibold text-foreground">
-                            {plan.data_amount || plan.name}
-                          </h3>
-                          <p className="text-xs text-muted-foreground">{plan.validity}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={isActive}
-                            onCheckedChange={(v) => handleStatusChange(planKey, v)}
-                          />
-                          {isActive ? (
-                            <Check className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <X className="h-4 w-4 text-red-500" />
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Status Badge */}
-                      <div className="mb-3">
-                        {plan.in_database ? (
-                          <Badge variant="secondary" className="text-xs">In Database</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-xs text-amber-600 border-amber-600/30">New from API</Badge>
-                        )}
-                      </div>
-
-                      {/* Prices */}
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">API Price</Label>
-                          <div className="mt-1 p-2 rounded-lg bg-muted text-sm font-medium">
-                            ₦{plan.api_price.toLocaleString()}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">App Price</Label>
-                          <Input
-                            type="number"
-                            value={sellingPrice}
-                            onChange={(e) => handlePriceChange(planKey, e.target.value)}
-                            className="mt-1 h-9"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Margin */}
-                      <div className="flex items-center justify-between text-xs mb-3">
-                        <span className="text-muted-foreground">Margin:</span>
-                        <Badge 
-                          variant="outline" 
-                          className={margin >= 0 ? 'text-green-600 border-green-600/30' : 'text-red-600 border-red-600/30'}
+          {/* Add from API Tab */}
+          <TabsContent value="api" className="space-y-4">
+            {/* Step 1: Select Network & Provider */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">1. Select Network & Provider</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex-1 min-w-[200px]">
+                    <Label className="text-xs text-muted-foreground mb-2 block">Network</Label>
+                    <div className="flex gap-2">
+                      {NETWORKS.map((network) => (
+                        <Button
+                          key={network}
+                          size="sm"
+                          variant={selectedNetwork === network ? 'default' : 'outline'}
+                          onClick={() => {
+                            setSelectedNetwork(network);
+                            setCategories([]);
+                            setSelectedCategory('');
+                            setApiPlans([]);
+                          }}
                         >
-                          ₦{margin.toLocaleString()} ({plan.api_price > 0 ? ((margin / plan.api_price) * 100).toFixed(1) : 0}%)
-                        </Badge>
-                      </div>
-
-                      {/* Save Button */}
-                      <Button
-                        size="sm"
-                        className="w-full"
-                        onClick={() => savePlan(plan)}
-                        disabled={savingPlan === planKey}
-                      >
-                        {savingPlan === planKey ? (
+                          {network.toUpperCase()}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="min-w-[200px]">
+                    <Label className="text-xs text-muted-foreground mb-2 block">Provider</Label>
+                    <div className="flex gap-2">
+                      <Select value={selectedProvider} onValueChange={(v) => {
+                        setSelectedProvider(v);
+                        setCategories([]);
+                        setSelectedCategory('');
+                        setApiPlans([]);
+                      }}>
+                        <SelectTrigger className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROVIDERS.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={fetchCategories} disabled={loadingCategories}>
+                        {loadingCategories ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <Save className="h-4 w-4 mr-1" />
-                            {plan.in_database ? 'Update' : 'Add to Database'}
-                          </>
+                          <Download className="h-4 w-4" />
                         )}
                       </Button>
                     </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Empty State */}
-        {plans.length === 0 && categories.length > 0 && selectedCategory && !loadingPlans && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Click "Fetch Plans" to load plans from the API
-            </CardContent>
-          </Card>
-        )}
+            {/* Step 2: Select Category & Fetch */}
+            {categories.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">2. Select Category</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2 flex-wrap">
+                    {categories.map((cat) => (
+                      <Button
+                        key={cat.id}
+                        size="sm"
+                        variant={selectedCategory === cat.id ? 'default' : 'outline'}
+                        onClick={() => {
+                          setSelectedCategory(cat.id);
+                          setApiPlans([]);
+                        }}
+                      >
+                        {cat.name}
+                      </Button>
+                    ))}
+                  </div>
+                  {selectedCategory && (
+                    <Button 
+                      className="mt-4" 
+                      onClick={fetchApiPlans} 
+                      disabled={loadingApiPlans}
+                    >
+                      {loadingApiPlans ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Fetch Plans
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Step 3: Add Plans */}
+            {apiPlans.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">3. Add Plans to Your Database</CardTitle>
+                  <CardDescription>
+                    Set your selling price and add plans. Already added plans are marked.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {apiPlans.map((plan) => {
+                      const planKey = `${plan.service_id}-${plan.plan_id}`;
+                      const isAdding = addingPlan === planKey;
+                      
+                      return (
+                        <ApiPlanRow
+                          key={planKey}
+                          plan={plan}
+                          isAdding={isAdding}
+                          onAdd={addPlanToDatabase}
+                        />
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Edit Plan Dialog */}
+        <Dialog open={!!editingPlan} onOpenChange={() => setEditingPlan(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Plan</DialogTitle>
+            </DialogHeader>
+            {editingPlan && (
+              <div className="space-y-4">
+                <div>
+                  <Label>Display Name</Label>
+                  <Input
+                    value={editingPlan.display_name}
+                    onChange={(e) => setEditingPlan({ ...editingPlan, display_name: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>API Price</Label>
+                    <Input value={`₦${editingPlan.api_price}`} disabled />
+                  </div>
+                  <div>
+                    <Label>Your Selling Price</Label>
+                    <Input
+                      type="number"
+                      value={editingPlan.selling_price}
+                      onChange={(e) => setEditingPlan({ 
+                        ...editingPlan, 
+                        selling_price: parseFloat(e.target.value) || 0 
+                      })}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label>Active</Label>
+                  <Switch
+                    checked={editingPlan.is_active}
+                    onCheckedChange={(v) => setEditingPlan({ ...editingPlan, is_active: v })}
+                  />
+                </div>
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex justify-between text-sm">
+                    <span>Margin:</span>
+                    <span className={`font-medium ${
+                      editingPlan.selling_price - editingPlan.api_price >= 0 
+                        ? 'text-green-600' 
+                        : 'text-red-600'
+                    }`}>
+                      ₦{(editingPlan.selling_price - editingPlan.api_price).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditingPlan(null)}>
+                Cancel
+              </Button>
+              <Button onClick={updatePlan} disabled={savingPlan}>
+                {savingPlan ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
+  );
+}
+
+// Separate component for API plan row with local price state
+function ApiPlanRow({ 
+  plan, 
+  isAdding, 
+  onAdd 
+}: { 
+  plan: ApiPlan; 
+  isAdding: boolean; 
+  onAdd: (plan: ApiPlan, price: number) => void;
+}) {
+  const [customPrice, setCustomPrice] = useState(plan.selling_price || plan.api_price);
+  const margin = customPrice - plan.api_price;
+
+  return (
+    <div className={`flex items-center gap-4 p-3 rounded-lg border ${
+      plan.in_database ? 'bg-muted/50 opacity-60' : 'bg-card'
+    }`}>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{plan.data_amount || plan.name}</span>
+          <span className="text-xs text-muted-foreground">{plan.validity}</span>
+          {plan.in_database && (
+            <Badge variant="secondary" className="text-xs">Added</Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          API: ₦{plan.api_price.toLocaleString()}
+        </p>
+      </div>
+      
+      <div className="flex items-center gap-3">
+        <div className="w-28">
+          <Input
+            type="number"
+            value={customPrice}
+            onChange={(e) => setCustomPrice(parseFloat(e.target.value) || 0)}
+            placeholder="Your price"
+            disabled={plan.in_database}
+            className="h-9"
+          />
+        </div>
+        <div className="w-20 text-right">
+          <span className={`text-sm font-mono ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            +₦{margin.toLocaleString()}
+          </span>
+        </div>
+        <Button
+          size="sm"
+          onClick={() => onAdd(plan, customPrice)}
+          disabled={isAdding || plan.in_database}
+        >
+          {isAdding ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : plan.in_database ? (
+            'Added'
+          ) : (
+            <>
+              <Plus className="h-4 w-4 mr-1" />
+              Add
+            </>
+          )}
+        </Button>
+      </div>
+    </div>
   );
 }
