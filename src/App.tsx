@@ -24,6 +24,15 @@ import Website from "./pages/Website";
 import NotFound from "./pages/NotFound";
 import ExamPins from "./pages/ExamPins";
 
+// Admin pages
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminTransactions from "./pages/admin/AdminTransactions";
+import AdminDataPlans from "./pages/admin/AdminDataPlans";
+import AdminAirtimePlans from "./pages/admin/AdminAirtimePlans";
+import AdminSettings from "./pages/admin/AdminSettings";
+
 const queryClient = new QueryClient();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -187,6 +196,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      
+      {/* Admin Routes - Separate standalone dashboard */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin" element={<AdminDashboard />} />
+      <Route path="/admin/users" element={<AdminUsers />} />
+      <Route path="/admin/transactions" element={<AdminTransactions />} />
+      <Route path="/admin/data-plans" element={<AdminDataPlans />} />
+      <Route path="/admin/airtime-plans" element={<AdminAirtimePlans />} />
+      <Route path="/admin/settings" element={<AdminSettings />} />
+      
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
