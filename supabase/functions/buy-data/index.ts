@@ -267,6 +267,7 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
+        service_id: plan.service_id,
         plan: plan.plan_id,
         phone_number: phoneNumber,
         reference: reference,
