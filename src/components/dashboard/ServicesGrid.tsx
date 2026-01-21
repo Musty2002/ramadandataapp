@@ -17,7 +17,7 @@ const services = [
   { icon: Zap, label: 'Electricity', path: '/electricity', comingSoon: false },
   { icon: Tv, label: 'TV Sub', path: '/tv', comingSoon: false },
   { icon: Banknote, label: 'Airtime to Cash', path: '/airtime-to-cash', comingSoon: true },
-  { icon: Fingerprint, label: 'BVN/NIN', path: '/bvn-nin', comingSoon: false },
+  { icon: Fingerprint, label: 'BVN/NIN', path: '/bvn-nin', comingSoon: true },
   { icon: Gift, label: 'Refer & Earn', path: '/referral', comingSoon: false },
 ];
 
