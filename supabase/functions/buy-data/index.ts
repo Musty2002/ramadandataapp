@@ -10,6 +10,16 @@ interface BuyDataRequest {
   phone_number: string
 }
 
+function asObject(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function isIsquarePlanInactiveError(message: string) {
+  return /plan\s+is\s+either\s+currently\s+inactive\s+or\s+does\s+not\s+exist/i.test(message)
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -137,12 +147,54 @@ Deno.serve(async (req) => {
       })
     }
 
+    const baseTxMetadata = asObject(transaction.metadata)
+
     // Call the API based on provider
     let apiResponse: any = null
     let apiError: string | null = null
+    let planUsed: any = plan
 
     if (plan.provider === 'isquare') {
       apiResponse = await callIsquareDataAPI(plan, cleanPhone, reference)
+
+      // If iSquare rejects the plan as inactive/non-existent, try a same-price fallback plan (RGC)
+      if (apiResponse?.error && isIsquarePlanInactiveError(String(apiResponse.error))) {
+        const { data: fallbackPlan } = await supabase
+          .from('data_plans')
+          .select('*')
+          .eq('network', plan.network)
+          .eq('category', plan.category)
+          .eq('data_amount', plan.data_amount)
+          .eq('provider', 'rgc')
+          .eq('is_active', true)
+          .not('product_id', 'is', null)
+          .eq('selling_price', sellingPrice)
+          .order('selling_price', { ascending: true })
+          .limit(1)
+          .maybeSingle()
+
+        if (fallbackPlan) {
+          const fallbackResp = await callRgcDataAPI(fallbackPlan, cleanPhone, reference)
+          if (!fallbackResp?.error) {
+            planUsed = fallbackPlan
+            apiResponse = {
+              ...fallbackResp,
+              fallback: {
+                from_provider: 'isquare',
+                from_plan_id: plan.id,
+                to_provider: 'rgc',
+                to_plan_id: fallbackPlan.id,
+              },
+            }
+          }
+        } else {
+          // Give a user-actionable error instead of a vague provider error.
+          apiResponse = {
+            error: 'Selected bundle is currently unavailable. Please choose another plan.',
+            raw: apiResponse?.raw,
+          }
+        }
+      }
     } else if (plan.provider === 'rgc') {
       apiResponse = await callRgcDataAPI(plan, cleanPhone, reference)
     }
@@ -157,7 +209,7 @@ Deno.serve(async (req) => {
         .update({ 
           status: 'failed',
           metadata: {
-            ...transaction.metadata,
+            ...baseTxMetadata,
             api_error: apiError,
             api_response: apiResponse
           }
@@ -194,43 +246,45 @@ Deno.serve(async (req) => {
     }
 
     // Update transaction with API response
-    const finalStatus = apiResponse?.status === 'success' ? 'success' : 'pending'
+    const finalStatus = apiResponse?.status === 'success' ? 'completed' : 'pending'
     await supabase
       .from('transactions')
       .update({ 
         status: finalStatus,
         metadata: {
-          ...transaction.metadata,
+          ...baseTxMetadata,
+          provider_used: planUsed?.provider ?? plan.provider,
+          plan_used_id: planUsed?.id ?? plan.id,
           api_response: apiResponse
         }
       })
       .eq('id', transaction.id)
 
     // Create notification
-    if (finalStatus === 'success') {
+    if (finalStatus === 'completed') {
       await supabase.from('notifications').insert({
         user_id: userId,
         title: 'Data Purchase Successful',
-        message: `${plan.display_name} has been sent to ${cleanPhone}`,
+        message: `${planUsed.display_name} has been sent to ${cleanPhone}`,
         type: 'success'
       })
     } else {
       await supabase.from('notifications').insert({
         user_id: userId,
         title: 'Data Purchase Processing',
-        message: `Your ${plan.display_name} purchase for ${cleanPhone} is being processed`,
+        message: `Your ${planUsed.display_name} purchase for ${cleanPhone} is being processed`,
         type: 'info'
       })
     }
 
-    console.log('Data purchase completed:', { reference, status: finalStatus, plan: plan.display_name })
+    console.log('Data purchase completed:', { reference, status: finalStatus, plan: planUsed.display_name })
 
     return new Response(JSON.stringify({ 
       success: true,
       reference,
       status: finalStatus,
-      message: finalStatus === 'success' 
-        ? `${plan.display_name} sent to ${cleanPhone}` 
+      message: finalStatus === 'completed' 
+        ? `${planUsed.display_name} sent to ${cleanPhone}` 
         : 'Your data purchase is being processed'
     }), { 
       status: 200, 
@@ -260,6 +314,10 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
 
     console.log('Calling iSquare API:', { service_id: plan.service_id, plan_id: plan.plan_id, phone: phoneNumber })
 
+    if (plan.service_id == null || plan.plan_id == null) {
+      return { error: 'Plan mapping missing (service_id/plan_id). Please choose another plan.' }
+    }
+
     const response = await fetch('https://isquaredata.com/api/data/buy/', {
       method: 'POST',
       headers: {
@@ -278,7 +336,14 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
       })
     })
 
-    const data = await response.json()
+    const data = await (async () => {
+      try {
+        return await response.json()
+      } catch {
+        const text = await response.text().catch(() => '')
+        return { message: text || 'Invalid JSON from provider' }
+      }
+    })()
     console.log('iSquare API response:', data)
 
     const validationPlanError = Array.isArray((data as any)?.plan)
@@ -314,6 +379,10 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
 
     console.log('Calling RGC API:', { product_id: plan.product_id, phone: phoneNumber })
 
+    if (!plan.product_id) {
+      return { error: 'Plan mapping missing (product_id). Please choose another plan.' }
+    }
+
     const response = await fetch('https://api.rgcdata.com.ng/api/v2/purchase/data', {
       method: 'POST',
       headers: {
@@ -327,7 +396,14 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
       })
     })
 
-    const data = await response.json()
+    const data = await (async () => {
+      try {
+        return await response.json()
+      } catch {
+        const text = await response.text().catch(() => '')
+        return { message: text || 'Invalid JSON from provider' }
+      }
+    })()
     console.log('RGC API response:', data)
 
     if (!response.ok || data.error || data.status === 'error') {
