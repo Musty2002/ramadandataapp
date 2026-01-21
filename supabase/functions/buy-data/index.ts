@@ -268,7 +268,10 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
       },
       body: JSON.stringify({
         service_id: plan.service_id,
+        // iSquare expects `plan` in some versions, but other endpoints use `plan_id`.
+        // Send both to avoid mismatches across iSquare deployments.
         plan: plan.plan_id,
+        plan_id: plan.plan_id,
         phone_number: phoneNumber,
         reference: reference,
         webhook_url: webhookUrl
@@ -278,9 +281,13 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
     const data = await response.json()
     console.log('iSquare API response:', data)
 
-    if (!response.ok || data.error || data.status === 'error') {
+    const validationPlanError = Array.isArray((data as any)?.plan)
+      ? (data as any).plan.join(', ')
+      : undefined
+
+    if (!response.ok || data.error || data.status === 'error' || validationPlanError) {
       return { 
-        error: data.message || data.error || 'iSquare API error',
+        error: data.message || data.error || validationPlanError || 'iSquare API error',
         raw: data
       }
     }
