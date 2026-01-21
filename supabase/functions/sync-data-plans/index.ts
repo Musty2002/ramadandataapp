@@ -122,7 +122,7 @@ async function fetchIsquarePlans(categoryId: string): Promise<any[]> {
         display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
         data_amount: dataAmount,
         validity: validity,
-        api_price: parseFloat(plan.price || plan.amount || 0)
+        api_price: parseFloat(plan.api_amount || plan.reseller_amount || plan.price || plan.amount || 0)
       }
     })
   } catch (error) {
