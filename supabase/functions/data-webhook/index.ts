@@ -53,6 +53,10 @@ Deno.serve(async (req) => {
       })
     }
 
+    const baseTxMetadata = transaction.metadata && typeof transaction.metadata === 'object' && !Array.isArray(transaction.metadata)
+      ? (transaction.metadata as Record<string, unknown>)
+      : {}
+
     // Already processed?
     if (transaction.status !== 'pending') {
       console.log('Transaction already processed:', transaction.status)
@@ -70,9 +74,9 @@ Deno.serve(async (req) => {
       await supabase
         .from('transactions')
         .update({ 
-          status: 'success',
+          status: 'completed',
           metadata: {
-            ...transaction.metadata,
+            ...baseTxMetadata,
             webhook_data: body,
             completed_at: new Date().toISOString()
           }
@@ -97,7 +101,7 @@ Deno.serve(async (req) => {
         .update({ 
           status: 'failed',
           metadata: {
-            ...transaction.metadata,
+            ...baseTxMetadata,
             webhook_data: body,
             failure_reason: message,
             failed_at: new Date().toISOString()
