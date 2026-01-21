@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -140,7 +141,11 @@ export default function Data() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Parse edge function error
+        const errorMessage = error.message || 'Purchase failed';
+        throw new Error(errorMessage);
+      }
 
       if (data?.success) {
         toast({
@@ -152,15 +157,26 @@ export default function Data() {
         setPhoneNumber('');
         navigate('/history');
       } else {
-        throw new Error(data?.error || 'Purchase failed');
+        throw new Error(data?.error || data?.details || 'Purchase failed');
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);
       const message = error instanceof Error ? error.message : 'Failed to purchase data. Please try again.';
+      
+      // Check for insufficient balance error
+      const isInsufficientBalance = message.toLowerCase().includes('insufficient balance');
+      
       toast({
         variant: 'destructive',
-        title: 'Purchase Failed',
-        description: message,
+        title: isInsufficientBalance ? 'Insufficient Balance' : 'Purchase Failed',
+        description: isInsufficientBalance 
+          ? 'You don\'t have enough funds. Tap below to add money to your wallet.'
+          : message,
+        action: isInsufficientBalance ? (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ) : undefined,
       });
     } finally {
       setPurchasing(false);
