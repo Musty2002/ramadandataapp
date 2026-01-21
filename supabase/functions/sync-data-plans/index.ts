@@ -5,25 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Provider configurations - extensible for future providers
-const PROVIDERS: Record<string, {
-  name: string;
-  fetchCategories: () => Promise<{ id: string; name: string; service_id?: number }[]>;
-  fetchPlans: (categoryId: string) => Promise<any[]>;
-}> = {
-  isquare: {
-    name: 'iSquare',
-    fetchCategories: fetchIsquareCategories,
-    fetchPlans: fetchIsquarePlans,
-  },
-  // RGC provider can be added here later
-  // rgc: {
-  //   name: 'RGC',
-  //   fetchCategories: fetchRGCCategories,
-  //   fetchPlans: fetchRGCPlans,
-  // },
-}
-
 // iSquare service mappings per network
 const ISQUARE_SERVICES: Record<string, { id: number; name: string; category: string }[]> = {
   mtn: [
@@ -43,8 +24,41 @@ const ISQUARE_SERVICES: Record<string, { id: number; name: string; category: str
   ],
 }
 
+// RGC network IDs mapping
+const RGC_NETWORKS: Record<string, number> = {
+  mtn: 1,
+  airtel: 2,
+  glo: 3,
+  '9mobile': 4,
+}
+
+// RGC category mappings
+const RGC_CATEGORIES: Record<string, { id: number; name: string; category: string }[]> = {
+  mtn: [
+    { id: 1, name: 'SME', category: 'sme' },
+    { id: 2, name: 'Gifting', category: 'gifting' },
+    { id: 3, name: 'Corporate', category: 'corporate' },
+  ],
+  airtel: [
+    { id: 1, name: 'SME', category: 'sme' },
+    { id: 2, name: 'Gifting', category: 'gifting' },
+    { id: 3, name: 'Corporate', category: 'corporate' },
+  ],
+  glo: [
+    { id: 1, name: 'SME', category: 'sme' },
+    { id: 2, name: 'Gifting', category: 'gifting' },
+    { id: 3, name: 'Corporate', category: 'corporate' },
+  ],
+  '9mobile': [
+    { id: 1, name: 'SME', category: 'sme' },
+    { id: 2, name: 'Gifting', category: 'gifting' },
+    { id: 3, name: 'Corporate', category: 'corporate' },
+  ],
+}
+
 let currentNetwork = 'mtn'
 
+// iSquare functions
 async function fetchIsquareCategories(): Promise<{ id: string; name: string; service_id?: number }[]> {
   const services = ISQUARE_SERVICES[currentNetwork] || []
   return services.map(s => ({
@@ -90,7 +104,6 @@ async function fetchIsquarePlans(categoryId: string): Promise<any[]> {
     const data = await response.json()
     console.log(`Service ${service.id} response:`, JSON.stringify(data).slice(0, 500))
 
-    // Handle different response formats
     const plans = Array.isArray(data) ? data : (data.plans || data.data || [])
 
     return plans.map((plan: any) => {
@@ -104,6 +117,7 @@ async function fetchIsquarePlans(categoryId: string): Promise<any[]> {
         category: categoryId,
         service_id: service.id,
         plan_id: plan.plan_id || plan.id,
+        product_id: null,
         name: planName,
         display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
         data_amount: dataAmount,
@@ -113,6 +127,120 @@ async function fetchIsquarePlans(categoryId: string): Promise<any[]> {
     })
   } catch (error) {
     console.error(`Error fetching iSquare plans:`, error)
+    return []
+  }
+}
+
+// RGC functions
+async function fetchRgcCategories(): Promise<{ id: string; name: string; service_id?: number }[]> {
+  const categories = RGC_CATEGORIES[currentNetwork] || []
+  return categories.map(c => ({
+    id: c.category,
+    name: c.name,
+  }))
+}
+
+async function fetchRgcPlans(categoryId: string): Promise<any[]> {
+  const apiKey = Deno.env.get('RGC_API_KEY')
+
+  if (!apiKey) {
+    throw new Error('RGC API key not configured')
+  }
+
+  const networkId = RGC_NETWORKS[currentNetwork]
+  if (!networkId) {
+    return []
+  }
+  
+  try {
+    console.log(`Fetching RGC plans for network ${currentNetwork} (${networkId}), category ${categoryId}...`)
+    
+    // RGC API endpoint to get data plans
+    const response = await fetch(`https://api.rgcdata.com.ng/api/v2/internet/data`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error(`Failed to fetch RGC plans: ${response.status}`)
+      const errorText = await response.text()
+      console.error('RGC error response:', errorText)
+      return []
+    }
+
+    const data = await response.json()
+    console.log(`RGC plans response:`, JSON.stringify(data).slice(0, 1000))
+
+    // RGC returns data in various formats, handle accordingly
+    let allPlans = []
+    
+    if (data.success && data.data) {
+      // Handle nested structure
+      if (Array.isArray(data.data)) {
+        allPlans = data.data
+      } else if (typeof data.data === 'object') {
+        // May have network-specific data
+        const networkName = currentNetwork.toUpperCase()
+        if (data.data[networkName]) {
+          allPlans = data.data[networkName]
+        } else if (data.data[currentNetwork]) {
+          allPlans = data.data[currentNetwork]
+        } else {
+          // Flatten all arrays in the object
+          allPlans = Object.values(data.data).flat()
+        }
+      }
+    } else if (Array.isArray(data)) {
+      allPlans = data
+    }
+
+    // Filter plans by network and category
+    const filteredPlans = allPlans.filter((plan: any) => {
+      const planNetwork = (plan.network || plan.network_name || '').toLowerCase()
+      const planCategory = (plan.type || plan.category || plan.plan_type || 'gifting').toLowerCase()
+      
+      // Match network
+      const networkMatch = planNetwork === currentNetwork || 
+                          planNetwork.includes(currentNetwork) ||
+                          plan.network_id === networkId
+
+      // Match category
+      const categoryMatch = planCategory === categoryId ||
+                           planCategory.includes(categoryId) ||
+                           (categoryId === 'sme' && planCategory.includes('sme')) ||
+                           (categoryId === 'gifting' && (planCategory.includes('gift') || planCategory.includes('normal'))) ||
+                           (categoryId === 'corporate' && planCategory.includes('corporate'))
+
+      return networkMatch && categoryMatch
+    })
+
+    console.log(`Filtered ${filteredPlans.length} plans for ${currentNetwork}/${categoryId}`)
+
+    return filteredPlans.map((plan: any) => {
+      const planName = plan.name || plan.plan_name || plan.description || ''
+      const dataAmount = extractDataAmount(planName) || plan.size || plan.data_amount || ''
+      const validity = extractValidity(planName) || plan.validity || plan.duration || 'Monthly'
+      const price = parseFloat(plan.price || plan.amount || plan.cost || 0)
+      
+      return {
+        provider: 'rgc',
+        network: currentNetwork,
+        category: categoryId,
+        service_id: null,
+        plan_id: null,
+        product_id: plan.id || plan.product_id || plan.plan_id,
+        name: planName,
+        display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
+        data_amount: dataAmount,
+        validity: validity,
+        api_price: price
+      }
+    })
+  } catch (error) {
+    console.error(`Error fetching RGC plans:`, error)
     return []
   }
 }
@@ -151,6 +279,24 @@ function extractValidity(planName: string): string {
   }
   
   return 'Monthly'
+}
+
+// Provider configurations
+const PROVIDERS: Record<string, {
+  name: string;
+  fetchCategories: () => Promise<{ id: string; name: string; service_id?: number }[]>;
+  fetchPlans: (categoryId: string) => Promise<any[]>;
+}> = {
+  isquare: {
+    name: 'iSquare',
+    fetchCategories: fetchIsquareCategories,
+    fetchPlans: fetchIsquarePlans,
+  },
+  rgc: {
+    name: 'RGC Data',
+    fetchCategories: fetchRgcCategories,
+    fetchPlans: fetchRgcPlans,
+  },
 }
 
 Deno.serve(async (req) => {
@@ -268,15 +414,21 @@ Deno.serve(async (req) => {
 
       // Merge API plans with DB data (app prices, active status)
       const mergedPlans = apiPlans.map((apiPlan: any) => {
-        const existing = existingPlans?.find(
-          (p: any) => p.service_id === apiPlan.service_id && p.plan_id === apiPlan.plan_id
-        )
+        // For iSquare, match by service_id + plan_id; for RGC, match by product_id
+        const existing = existingPlans?.find((p: any) => {
+          if (provider === 'isquare') {
+            return p.service_id === apiPlan.service_id && p.plan_id === apiPlan.plan_id
+          } else if (provider === 'rgc') {
+            return p.product_id === apiPlan.product_id
+          }
+          return false
+        })
         
         return {
           ...apiPlan,
           db_id: existing?.id || null,
           selling_price: existing?.selling_price || Math.ceil(apiPlan.api_price * 1.1),
-          is_active: existing?.is_active ?? false, // Default to inactive for new plans
+          is_active: existing?.is_active ?? false,
           in_database: !!existing,
         }
       })
@@ -309,6 +461,7 @@ Deno.serve(async (req) => {
             display_name: plan.display_name,
             data_amount: plan.data_amount,
             validity: plan.validity,
+            product_id: plan.product_id,
             updated_at: new Date().toISOString(),
           })
           .eq('id', plan.db_id)
@@ -333,6 +486,7 @@ Deno.serve(async (req) => {
             category: plan.category,
             service_id: plan.service_id,
             plan_id: plan.plan_id,
+            product_id: plan.product_id,
             name: plan.name,
             display_name: plan.display_name,
             data_amount: plan.data_amount,

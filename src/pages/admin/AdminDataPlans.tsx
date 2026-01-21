@@ -37,7 +37,7 @@ interface Category {
 const NETWORKS = ['mtn', 'airtel', 'glo', '9mobile'];
 const PROVIDERS = [
   { id: 'isquare', name: 'iSquare' },
-  // Add more providers here as needed
+  { id: 'rgc', name: 'RGC Data' },
 ];
 
 export default function AdminDataPlans() {
