@@ -393,7 +393,7 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
       return { error: 'RGC API key not configured' }
     }
 
-    console.log('Calling RGC API:', { product_id: plan.product_id, phone: phoneNumber })
+    console.log('Calling RGC API:', { plan: plan.product_id, mobile_number: phoneNumber })
 
     if (!plan.product_id) {
       return { error: 'Plan mapping missing (product_id). Please choose another plan.' }
