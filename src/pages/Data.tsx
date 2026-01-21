@@ -43,30 +43,30 @@ export default function Data() {
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [cheapestPlans, setCheapestPlans] = useState<DataPlan[]>([]);
+  const [plans, setPlans] = useState<DataPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  // Fetch plans when network changes
+  // Fetch plans from database when network changes
   useEffect(() => {
     if (selectedNetwork) {
-      fetchCheapestPlans(selectedNetwork);
+      fetchPlans(selectedNetwork);
     } else {
-      setCheapestPlans([]);
+      setPlans([]);
       setCategories([]);
       setSelectedCategory(null);
     }
     setSelectedPlan(null);
   }, [selectedNetwork]);
 
-  const fetchCheapestPlans = async (network: string) => {
+  const fetchPlans = async (network: string) => {
     setLoading(true);
     try {
-      // Fetch all plans for this network from both providers
+      // Fetch all active plans for this network from the database
       const { data, error } = await supabase
-        .from('data_plans' as any)
+        .from('data_plans')
         .select('*')
         .eq('network', network)
         .eq('is_active', true)
@@ -75,29 +75,17 @@ export default function Data() {
       if (error) throw error;
 
       const allPlans = (data || []) as unknown as DataPlan[];
-      
-      // Group by data_amount + category and pick cheapest
-      const cheapestByPlan = new Map<string, DataPlan>();
-      
-      allPlans.forEach(plan => {
-        const key = `${plan.data_amount}-${plan.category}`;
-        const existing = cheapestByPlan.get(key);
-        
-        if (!existing || plan.selling_price < existing.selling_price) {
-          cheapestByPlan.set(key, plan);
-        }
-      });
-
-      const cheapest = Array.from(cheapestByPlan.values());
-      setCheapestPlans(cheapest);
+      setPlans(allPlans);
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(cheapest.map(p => p.category).filter(Boolean))] as string[];
+      const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
       setCategories(uniqueCategories);
       
       // Set default category
       if (uniqueCategories.length > 0) {
         setSelectedCategory(uniqueCategories[0]);
+      } else {
+        setSelectedCategory(null);
       }
     } catch (error) {
       console.error('Error fetching plans:', error);
@@ -187,7 +175,7 @@ export default function Data() {
     }).format(price);
   };
 
-  const filteredPlans = cheapestPlans.filter(p => p.category === selectedCategory);
+  const filteredPlans = plans.filter(p => p.category === selectedCategory);
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -196,8 +184,9 @@ export default function Data() {
       awoof: 'Awoof',
       coupon: 'Coupon',
       gifting: 'Gifting',
+      datashare: 'DataShare',
     };
-    return labels[category] || category.toUpperCase();
+    return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
   };
 
   return (
