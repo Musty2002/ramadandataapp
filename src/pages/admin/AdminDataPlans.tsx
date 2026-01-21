@@ -1,17 +1,15 @@
 import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, RefreshCw, Loader2, Edit, Plus } from 'lucide-react';
+import { RefreshCw, Loader2, Save, Check, X } from 'lucide-react';
 
 interface DataPlan {
   id: string;
@@ -27,28 +25,61 @@ interface DataPlan {
   is_active: boolean;
 }
 
+const networks = ['mtn', 'airtel', 'glo', '9mobile'];
+const categoryLabels: Record<string, string> = {
+  sme: 'SME',
+  corporate: 'Corporate',
+  awoof: 'Awoof',
+  coupon: 'Coupon',
+  gifting: 'Gifting',
+};
+
 export default function AdminDataPlans() {
   const [plans, setPlans] = useState<DataPlan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [networkFilter, setNetworkFilter] = useState<string>('all');
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
-  const [editForm, setEditForm] = useState({ selling_price: '', is_active: true });
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [selectedNetwork, setSelectedNetwork] = useState<string>('mtn');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [editedPrices, setEditedPrices] = useState<Record<string, string>>({});
+  const [editedStatus, setEditedStatus] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchPlans = async () => {
+  // Fetch plans when network changes
+  useEffect(() => {
+    if (selectedNetwork) {
+      fetchPlans(selectedNetwork);
+    }
+  }, [selectedNetwork]);
+
+  // Set first category when categories change
+  useEffect(() => {
+    if (categories.length > 0 && !categories.includes(selectedCategory)) {
+      setSelectedCategory(categories[0]);
+    }
+  }, [categories]);
+
+  const fetchPlans = async (network: string) => {
     setLoading(true);
     try {
       const { data, error } = await supabase
         .from('data_plans')
         .select('*')
-        .order('network', { ascending: true })
+        .eq('network', network)
         .order('selling_price', { ascending: true });
 
       if (error) throw error;
-      setPlans(data || []);
+      
+      const allPlans = (data || []) as DataPlan[];
+      setPlans(allPlans);
+      
+      // Extract unique categories
+      const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))];
+      setCategories(uniqueCategories);
+      
+      // Reset edited values
+      setEditedPrices({});
+      setEditedStatus({});
     } catch (error) {
       console.error('Error fetching data plans:', error);
       toast({
@@ -61,23 +92,24 @@ export default function AdminDataPlans() {
     }
   };
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  const handleEdit = (plan: DataPlan) => {
-    setSelectedPlan(plan);
-    setEditForm({
-      selling_price: plan.selling_price.toString(),
-      is_active: plan.is_active,
-    });
-    setEditDialogOpen(true);
+  const handlePriceChange = (planId: string, value: string) => {
+    setEditedPrices(prev => ({ ...prev, [planId]: value }));
   };
 
-  const handleSave = async () => {
-    if (!selectedPlan) return;
+  const handleStatusChange = (planId: string, value: boolean) => {
+    setEditedStatus(prev => ({ ...prev, [planId]: value }));
+  };
 
-    const price = parseFloat(editForm.selling_price);
+  const handleSave = async (plan: DataPlan) => {
+    const newPrice = editedPrices[plan.id];
+    const newStatus = editedStatus[plan.id];
+    
+    // Check if anything changed
+    if (newPrice === undefined && newStatus === undefined) {
+      return;
+    }
+
+    const price = newPrice !== undefined ? parseFloat(newPrice) : plan.selling_price;
     if (isNaN(price) || price < 0) {
       toast({
         variant: 'destructive',
@@ -87,26 +119,47 @@ export default function AdminDataPlans() {
       return;
     }
 
-    setSaving(true);
+    setSaving(plan.id);
     try {
+      const updates: any = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (newPrice !== undefined) {
+        updates.selling_price = price;
+      }
+      if (newStatus !== undefined) {
+        updates.is_active = newStatus;
+      }
+
       const { error } = await supabase
         .from('data_plans')
-        .update({
-          selling_price: price,
-          is_active: editForm.is_active,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', selectedPlan.id);
+        .update(updates)
+        .eq('id', plan.id);
 
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Data plan updated successfully',
+        title: 'Saved',
+        description: `${plan.display_name} updated`,
       });
 
-      setEditDialogOpen(false);
-      fetchPlans();
+      // Update local state
+      setPlans(prev => prev.map(p => 
+        p.id === plan.id 
+          ? { ...p, selling_price: price, is_active: newStatus ?? p.is_active }
+          : p
+      ));
+      
+      // Clear edited state for this plan
+      setEditedPrices(prev => {
+        const { [plan.id]: _, ...rest } = prev;
+        return rest;
+      });
+      setEditedStatus(prev => {
+        const { [plan.id]: _, ...rest } = prev;
+        return rest;
+      });
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -114,56 +167,27 @@ export default function AdminDataPlans() {
         description: error.message || 'Failed to update plan',
       });
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
-  const handleBulkPriceUpdate = async (percentage: number) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to ${percentage > 0 ? 'increase' : 'decrease'} all prices by ${Math.abs(percentage)}%?`
-    );
-
-    if (!confirmed) return;
-
-    setLoading(true);
-    try {
-      for (const plan of plans) {
-        const newPrice = Math.round(plan.selling_price * (1 + percentage / 100));
-        await supabase
-          .from('data_plans')
-          .update({ selling_price: newPrice, updated_at: new Date().toISOString() })
-          .eq('id', plan.id);
-      }
-
-      toast({
-        title: 'Success',
-        description: `All prices ${percentage > 0 ? 'increased' : 'decreased'} by ${Math.abs(percentage)}%`,
-      });
-
-      fetchPlans();
-    } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to update prices',
-      });
-    } finally {
-      setLoading(false);
-    }
+  const filteredPlans = plans.filter(p => p.category === selectedCategory);
+  
+  const hasChanges = (planId: string) => {
+    return editedPrices[planId] !== undefined || editedStatus[planId] !== undefined;
   };
 
-  const networks = [...new Set(plans.map((p) => p.network))];
+  const getDisplayPrice = (plan: DataPlan) => {
+    return editedPrices[plan.id] !== undefined 
+      ? editedPrices[plan.id] 
+      : plan.selling_price.toString();
+  };
 
-  const filteredPlans = plans.filter((plan) => {
-    const matchesSearch =
-      plan.display_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      plan.network.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      plan.category.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesNetwork = networkFilter === 'all' || plan.network.toLowerCase() === networkFilter;
-
-    return matchesSearch && matchesNetwork;
-  });
+  const getDisplayStatus = (plan: DataPlan) => {
+    return editedStatus[plan.id] !== undefined 
+      ? editedStatus[plan.id] 
+      : plan.is_active;
+  };
 
   return (
     <AdminLayout>
@@ -171,161 +195,171 @@ export default function AdminDataPlans() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold">Data Plans</h1>
-            <p className="text-muted-foreground">Manage data plan prices and availability</p>
+            <p className="text-muted-foreground">Manage data plan prices</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleBulkPriceUpdate(5)}>
-              +5%
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => handleBulkPriceUpdate(-5)}>
-              -5%
-            </Button>
-            <Button variant="outline" onClick={fetchPlans} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => fetchPlans(selectedNetwork)} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
         </div>
 
+        {/* Network Selection */}
         <Card>
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="relative flex-1 w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search plans..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={networkFilter} onValueChange={setNetworkFilter}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Filter by network" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Networks</SelectItem>
-                  {networks.map((network) => (
-                    <SelectItem key={network} value={network.toLowerCase()}>
-                      {network.toUpperCase()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Select Network</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-4 gap-3">
+              {networks.map((network) => (
+                <Button
+                  key={network}
+                  variant={selectedNetwork === network ? 'default' : 'outline'}
+                  className="w-full"
+                  onClick={() => setSelectedNetwork(network)}
+                >
+                  {network.toUpperCase()}
+                </Button>
+              ))}
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Category Selection */}
+        {categories.length > 0 && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Select Category</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+                <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 5)}, 1fr)` }}>
+                  {categories.map((cat) => (
+                    <TabsTrigger key={cat} value={cat}>
+                      {categoryLabels[cat] || cat.toUpperCase()}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Plans Grid */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              {categoryLabels[selectedCategory] || selectedCategory.toUpperCase()} Plans
+            </CardTitle>
+            <CardDescription>
+              Set your app prices below. Only the App Price is shown to users.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
+            ) : filteredPlans.length === 0 ? (
+              <p className="text-center text-muted-foreground py-12">
+                No plans found for this category
+              </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Network</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Validity</TableHead>
-                      <TableHead>API Price</TableHead>
-                      <TableHead>Selling Price</TableHead>
-                      <TableHead>Margin</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredPlans.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
-                          No data plans found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredPlans.map((plan) => {
-                        const margin = plan.selling_price - plan.api_price;
-                        const marginPercent = ((margin / plan.api_price) * 100).toFixed(1);
-                        return (
-                          <TableRow key={plan.id}>
-                            <TableCell>
-                              <Badge variant="outline">{plan.network.toUpperCase()}</Badge>
-                            </TableCell>
-                            <TableCell className="font-medium">{plan.display_name}</TableCell>
-                            <TableCell className="capitalize">{plan.category}</TableCell>
-                            <TableCell>{plan.data_amount || '-'}</TableCell>
-                            <TableCell>{plan.validity || '-'}</TableCell>
-                            <TableCell>₦{plan.api_price.toLocaleString()}</TableCell>
-                            <TableCell className="font-medium">₦{plan.selling_price.toLocaleString()}</TableCell>
-                            <TableCell>
-                              <span className={margin >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                ₦{margin.toLocaleString()} ({marginPercent}%)
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              <Badge className={plan.is_active ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}>
-                                {plan.is_active ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <Button size="sm" variant="ghost" onClick={() => handleEdit(plan)}>
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredPlans.map((plan) => {
+                  const appPrice = parseFloat(getDisplayPrice(plan)) || 0;
+                  const margin = appPrice - plan.api_price;
+                  const isActive = getDisplayStatus(plan);
+                  const changed = hasChanges(plan.id);
+                  
+                  return (
+                    <div
+                      key={plan.id}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        changed ? 'border-primary bg-primary/5' : 'border-border bg-card'
+                      } ${!isActive ? 'opacity-60' : ''}`}
+                    >
+                      {/* Plan Header */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {plan.data_amount || plan.name}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">{plan.validity}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={(v) => handleStatusChange(plan.id, v)}
+                          />
+                          {isActive ? (
+                            <Check className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <X className="h-4 w-4 text-red-500" />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Prices */}
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">API Price</Label>
+                          <div className="mt-1 p-2 rounded-lg bg-muted text-sm font-medium">
+                            ₦{plan.api_price.toLocaleString()}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">App Price</Label>
+                          <Input
+                            type="number"
+                            value={getDisplayPrice(plan)}
+                            onChange={(e) => handlePriceChange(plan.id, e.target.value)}
+                            className="mt-1 h-9"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Margin */}
+                      <div className="flex items-center justify-between text-xs mb-3">
+                        <span className="text-muted-foreground">Margin:</span>
+                        <Badge 
+                          variant="outline" 
+                          className={margin >= 0 ? 'text-green-600 border-green-600/30' : 'text-red-600 border-red-600/30'}
+                        >
+                          ₦{margin.toLocaleString()} ({((margin / plan.api_price) * 100).toFixed(1)}%)
+                        </Badge>
+                      </div>
+
+                      {/* Provider Badge */}
+                      <div className="flex items-center justify-between">
+                        <Badge variant="secondary" className="text-xs">
+                          {plan.provider}
+                        </Badge>
+                        
+                        {/* Save Button */}
+                        <Button
+                          size="sm"
+                          onClick={() => handleSave(plan)}
+                          disabled={!changed || saving === plan.id}
+                          className={changed ? '' : 'invisible'}
+                        >
+                          {saving === plan.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-1" />
+                              Save
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Data Plan</DialogTitle>
-            <DialogDescription>
-              Update pricing for {selectedPlan?.display_name}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>API Price (Cost)</Label>
-              <Input value={`₦${selectedPlan?.api_price.toLocaleString()}`} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Selling Price (₦)</Label>
-              <Input
-                type="number"
-                value={editForm.selling_price}
-                onChange={(e) => setEditForm({ ...editForm, selling_price: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Active</Label>
-              <Switch
-                checked={editForm.is_active}
-                onCheckedChange={(checked) => setEditForm({ ...editForm, is_active: checked })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </AdminLayout>
   );
 }
