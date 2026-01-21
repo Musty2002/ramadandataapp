@@ -18,61 +18,76 @@ const services = [
     label: 'Data', 
     description: 'Buy data bundles',
     path: '/data', 
-    color: 'bg-purple-100 text-purple-600' 
+    color: 'bg-purple-100 text-purple-600',
+    comingSoon: false
   },
   { 
     icon: Phone, 
     label: 'Airtime', 
     description: 'Recharge your line',
     path: '/airtime', 
-    color: 'bg-green-100 text-green-600' 
+    color: 'bg-green-100 text-green-600',
+    comingSoon: false
   },
   { 
     icon: CreditCard, 
     label: 'Data Card', 
     description: 'Purchase data cards',
     path: '/data-card', 
-    color: 'bg-blue-100 text-blue-600' 
+    color: 'bg-blue-100 text-blue-600',
+    comingSoon: false
   },
   { 
     icon: Zap, 
     label: 'Electricity', 
     description: 'Pay electricity bills',
     path: '/electricity', 
-    color: 'bg-yellow-100 text-yellow-600' 
+    color: 'bg-yellow-100 text-yellow-600',
+    comingSoon: false
   },
   { 
     icon: Tv, 
     label: 'TV Subscription', 
     description: 'DSTV, GOTV, Startimes',
     path: '/tv', 
-    color: 'bg-red-100 text-red-600' 
+    color: 'bg-red-100 text-red-600',
+    comingSoon: false
   },
   { 
     icon: Banknote, 
     label: 'Airtime to Cash', 
     description: 'Convert airtime to cash',
     path: '/airtime-to-cash', 
-    color: 'bg-indigo-100 text-indigo-600' 
+    color: 'bg-indigo-100 text-indigo-600',
+    comingSoon: true
   },
   { 
     icon: Fingerprint, 
     label: 'BVN/NIN', 
     description: 'Verify your identity',
     path: '/bvn-nin', 
-    color: 'bg-orange-100 text-orange-600' 
+    color: 'bg-orange-100 text-orange-600',
+    comingSoon: false
   },
   { 
     icon: Gift, 
     label: 'Refer & Earn', 
     description: 'Earn ₦200 per referral',
     path: '/referral', 
-    color: 'bg-pink-100 text-pink-600' 
+    color: 'bg-pink-100 text-pink-600',
+    comingSoon: false
   },
 ];
 
 export default function Services() {
   const navigate = useNavigate();
+
+  const handleServiceClick = (path: string, comingSoon: boolean) => {
+    if (comingSoon) {
+      return;
+    }
+    navigate(path);
+  };
 
   return (
     <MobileLayout>
@@ -80,11 +95,13 @@ export default function Services() {
         <h1 className="text-xl font-bold text-foreground mb-6">All Services</h1>
 
         <div className="space-y-3">
-          {services.map(({ icon: Icon, label, description, path, color }) => (
+          {services.map(({ icon: Icon, label, description, path, color, comingSoon }) => (
             <button
               key={path}
-              onClick={() => navigate(path)}
-              className="w-full bg-card rounded-xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow"
+              onClick={() => handleServiceClick(path, comingSoon)}
+              className={`w-full bg-card rounded-xl p-4 flex items-center gap-4 shadow-sm transition-shadow relative ${
+                comingSoon ? 'opacity-60' : 'hover:shadow-md'
+              }`}
             >
               <div className={`w-12 h-12 rounded-xl ${color} flex items-center justify-center`}>
                 <Icon className="w-6 h-6" />
@@ -93,7 +110,13 @@ export default function Services() {
                 <p className="font-medium text-foreground">{label}</p>
                 <p className="text-sm text-muted-foreground">{description}</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              {comingSoon ? (
+                <span className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded-full font-medium">
+                  Coming Soon
+                </span>
+              ) : (
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              )}
             </button>
           ))}
         </div>
