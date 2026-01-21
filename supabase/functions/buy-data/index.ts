@@ -188,6 +188,22 @@ Deno.serve(async (req) => {
             }
           }
         } else {
+          // Mark this plan inactive so it won't be shown again.
+          // We use a service-role client here because end-users cannot update plans.
+          try {
+            const adminSupabase = createClient(
+              Deno.env.get('SUPABASE_URL')!,
+              Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+            )
+            await adminSupabase
+              .from('data_plans')
+              .update({ is_active: false, updated_at: new Date().toISOString() })
+              .eq('id', plan.id)
+            console.log('Auto-disabled unavailable iSquare plan:', { id: plan.id, service_id: plan.service_id, plan_id: plan.plan_id })
+          } catch (e) {
+            console.error('Failed to auto-disable plan:', e)
+          }
+
           // Give a user-actionable error instead of a vague provider error.
           apiResponse = {
             error: 'Selected bundle is currently unavailable. Please choose another plan.',
