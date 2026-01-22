@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Smartphone, Wifi, Zap, Tv, Shield, Clock, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { FloatingWhatsApp } from '@/components/website/FloatingWhatsApp';
 import logo from '@/assets/ramadan-logo.jpeg';
 import iphoneMockup from '@/assets/iphone-mockup.png';
 
@@ -309,6 +310,9 @@ export default function Website() {
           </div>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <FloatingWhatsApp />
     </div>
   );
 }
