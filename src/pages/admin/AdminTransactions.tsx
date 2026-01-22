@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -39,44 +39,35 @@ export default function AdminTransactions() {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(500);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
+      const url = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data`);
+      url.searchParams.set('action', 'transactions');
       if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter as 'completed' | 'pending' | 'failed');
+        url.searchParams.set('status', statusFilter);
       }
 
-      const { data, error } = await query;
+      const response = await fetch(url.toString(), {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
+      const result = await response.json();
 
-      // Fetch user info for each transaction
-      const transactionsWithUsers = await Promise.all(
-        (data || []).map(async (tx) => {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('user_id', tx.user_id)
-            .maybeSingle();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch transactions');
+      }
 
-          return {
-            ...tx,
-            user_name: profile?.full_name || 'Unknown',
-            user_email: profile?.email || '',
-          };
-        })
-      );
-
-      setTransactions(transactionsWithUsers);
-    } catch (error) {
+      setTransactions(result.data || []);
+    } catch (error: any) {
       console.error('Error fetching transactions:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to fetch transactions',
+        description: error.message || 'Failed to fetch transactions',
       });
     } finally {
       setLoading(false);
@@ -92,39 +83,32 @@ export default function AdminTransactions() {
 
     setRefundLoading(true);
     try {
-      // Get current wallet balance
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', selectedTransaction.user_id)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      if (walletError) throw walletError;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data?action=refund`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            transaction_id: selectedTransaction.id,
+            user_id: selectedTransaction.user_id,
+            amount: selectedTransaction.amount,
+            description: selectedTransaction.description,
+            reference: selectedTransaction.reference,
+          }),
+        }
+      );
 
-      const newBalance = Number(wallet.balance) + selectedTransaction.amount;
+      const result = await response.json();
 
-      // Update wallet balance
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({ balance: newBalance })
-        .eq('user_id', selectedTransaction.user_id);
-
-      if (updateError) throw updateError;
-
-      // Create refund transaction
-      const { error: refundTxError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: selectedTransaction.user_id,
-          type: 'credit',
-          category: 'deposit',
-          amount: selectedTransaction.amount,
-          description: `Refund for: ${selectedTransaction.description}`,
-          status: 'completed',
-          reference: `REFUND-${selectedTransaction.reference || selectedTransaction.id}`,
-        });
-
-      if (refundTxError) throw refundTxError;
+      if (!response.ok) {
+        throw new Error(result.error || 'Refund failed');
+      }
 
       toast({
         title: 'Refund Successful',
