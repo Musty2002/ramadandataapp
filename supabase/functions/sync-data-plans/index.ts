@@ -244,6 +244,10 @@ async function fetchRgcPlans(categoryId: string): Promise<any[]> {
       const planName = plan.name || ''
       const dataAmount = planName.trim()
       const price = parseFloat(plan.amount || 0)
+      // RGC API uses 'id' as the plan identifier for purchases, not 'product_id'
+      const planId = plan.id
+      
+      console.log(`Mapping RGC plan: id=${planId}, name=${planName}, category=${plan.category}`)
       
       return {
         provider: 'rgc',
@@ -251,7 +255,7 @@ async function fetchRgcPlans(categoryId: string): Promise<any[]> {
         category: categoryId,
         service_id: null,
         plan_id: null,
-        product_id: String(plan.product_id || plan.id),
+        product_id: String(planId),
         name: `${plan.category} - ${planName}`,
         display_name: `${currentNetwork.toUpperCase()} ${dataAmount}`.trim(),
         data_amount: dataAmount,
