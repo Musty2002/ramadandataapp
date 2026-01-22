@@ -43,6 +43,13 @@ import AdminSettings from "./pages/admin/AdminSettings";
 
 const queryClient = new QueryClient();
 
+function RootRedirect() {
+  const hostname = window.location.hostname.toLowerCase();
+  const isAdminHost = hostname === "admin.ramadandataapp.com.ng";
+
+  return <Navigate to={isAdminHost ? "/admin" : "/dashboard"} replace />;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -82,7 +89,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RootRedirect />} />
       <Route path="/website" element={<Website />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/delete-account" element={<DeleteAccount />} />
