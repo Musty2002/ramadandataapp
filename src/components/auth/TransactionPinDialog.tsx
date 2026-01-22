@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Delete, Lock, Check, AlertCircle } from 'lucide-react';
+import { Delete, AlertCircle } from 'lucide-react';
+import logo from '@/assets/logo.jpeg';
 
 interface TransactionPinDialogProps {
   open: boolean;
@@ -140,8 +141,8 @@ export function TransactionPinDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xs sm:max-w-sm">
         <DialogHeader className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-            <Lock className="w-8 h-8 text-primary" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden shadow-md">
+            <img src={logo} alt="RDS Data" className="w-full h-full object-cover" />
           </div>
           <DialogTitle className="text-center">{getTitle()}</DialogTitle>
           <DialogDescription className="text-center">

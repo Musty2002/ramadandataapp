@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Delete, Shield, AlertCircle } from 'lucide-react';
+import { Delete, AlertCircle } from 'lucide-react';
+import logo from '@/assets/logo.jpeg';
 
 interface AppLockSetupDialogProps {
   open: boolean;
@@ -30,6 +31,11 @@ export async function setupAppLockPin(pin: string): Promise<void> {
   const hash = await hashPin(pin);
   localStorage.setItem(APP_LOCK_PIN_HASH_KEY, hash);
   localStorage.setItem(APP_LOCK_ENABLED_KEY, 'true');
+}
+
+export function disableAppLock(): void {
+  localStorage.removeItem(APP_LOCK_PIN_HASH_KEY);
+  localStorage.removeItem(APP_LOCK_ENABLED_KEY);
 }
 
 export function AppLockSetupDialog({
@@ -101,8 +107,8 @@ export function AppLockSetupDialog({
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent className="max-w-xs sm:max-w-sm" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-            <Shield className="w-8 h-8 text-primary" />
+          <div className="w-16 h-16 mx-auto mb-4 rounded-xl overflow-hidden shadow-md">
+            <img src={logo} alt="RDS Data" className="w-full h-full object-cover" />
           </div>
           <DialogTitle className="text-center">
             {step === 'confirm' ? 'Confirm App Lock PIN' : 'Set App Lock PIN'}

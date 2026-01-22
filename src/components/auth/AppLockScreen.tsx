@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Delete, Lock, Fingerprint } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Delete, Fingerprint } from 'lucide-react';
 import logo from '@/assets/logo.jpeg';
+import { Capacitor } from '@capacitor/core';
+import { NativeBiometric, BiometryType } from 'capacitor-native-biometric';
 
 const PIN_LENGTH = 6;
 const APP_LOCK_PIN_HASH_KEY = 'app_lock_pin_hash';
 const APP_LOCK_ENABLED_KEY = 'app_lock_enabled';
 const APP_UNLOCKED_KEY = 'app_unlocked_session';
+const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
 // Simple hash function for PIN
 async function hashPin(pin: string): Promise<string> {
@@ -52,6 +54,10 @@ export function isAppUnlocked(): boolean {
   return sessionStorage.getItem(APP_UNLOCKED_KEY) === 'true';
 }
 
+export function isBiometricEnabled(): boolean {
+  return localStorage.getItem(BIOMETRIC_ENABLED_KEY) === 'true';
+}
+
 interface AppLockScreenProps {
   onUnlock: () => void;
   mode?: 'unlock' | 'setup' | 'confirm';
@@ -64,13 +70,49 @@ export function AppLockScreen({ onUnlock, mode = 'unlock', onSetupComplete }: Ap
   const [step, setStep] = useState<'enter' | 'confirm'>(mode === 'setup' ? 'enter' : 'enter');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   useEffect(() => {
     setPin('');
     setConfirmPin('');
     setError('');
     setStep('enter');
+    
+    // Check biometric availability and attempt authentication
+    if (mode === 'unlock' && Capacitor.isNativePlatform() && isBiometricEnabled()) {
+      checkAndUseBiometric();
+    }
   }, [mode]);
+
+  const checkAndUseBiometric = async () => {
+    try {
+      const result = await NativeBiometric.isAvailable();
+      if (result.isAvailable) {
+        setBiometricAvailable(true);
+        // Auto-trigger biometric on load
+        handleBiometricAuth();
+      }
+    } catch (error) {
+      console.log('Biometric not available:', error);
+    }
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      await NativeBiometric.verifyIdentity({
+        title: 'Unlock RDS Data',
+        subtitle: 'Use biometric to unlock',
+        description: 'Place your finger on the sensor or look at the camera',
+      });
+      
+      // Biometric verified successfully
+      setAppUnlocked();
+      onUnlock();
+    } catch (error) {
+      console.log('Biometric auth failed:', error);
+      // User can still use PIN
+    }
+  };
 
   const triggerShake = () => {
     setShake(true);
@@ -186,12 +228,16 @@ export function AppLockScreen({ onUnlock, mode = 'unlock', onSetupComplete }: Ap
             if (mode === 'setup' && step === 'confirm') {
               setStep('enter');
               setConfirmPin('');
+            } else if (mode === 'unlock' && biometricAvailable && isBiometricEnabled()) {
+              handleBiometricAuth();
             }
           }}
         >
-          {mode === 'setup' && step === 'confirm' && (
+          {mode === 'setup' && step === 'confirm' ? (
             <span className="text-sm text-muted-foreground">Back</span>
-          )}
+          ) : mode === 'unlock' && biometricAvailable && isBiometricEnabled() ? (
+            <Fingerprint className="w-6 h-6 text-primary" />
+          ) : null}
         </button>
         <button
           className="h-16 w-16 mx-auto rounded-full bg-muted hover:bg-muted/80 active:scale-95 transition-all flex items-center justify-center text-2xl font-semibold"
