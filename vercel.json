@@ -29,7 +29,7 @@
       "permanent": true
     },
     {
-      "source": "/:path((?!admin).*)",
+      "source": "/:path((?!admin|assets).*)",
       "has": [
         {
           "type": "host",
