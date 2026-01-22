@@ -149,6 +149,12 @@ Deno.serve(async (req) => {
 
     const baseTxMetadata = asObject(transaction.metadata)
 
+    // Create admin client for status updates (RLS blocks user updates on transactions)
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
     // Call the API based on provider
     let apiResponse: any = null
     let apiError: string | null = null
@@ -219,8 +225,8 @@ Deno.serve(async (req) => {
       apiError = apiResponse.error
       console.error('API error:', apiError)
 
-      // Update transaction as failed
-      await supabase
+      // Update transaction as failed using admin client
+      const { error: updateError } = await adminSupabase
         .from('transactions')
         .update({ 
           status: 'failed',
@@ -232,8 +238,12 @@ Deno.serve(async (req) => {
         })
         .eq('id', transaction.id)
 
+      if (updateError) {
+        console.error('Failed to update transaction status:', updateError)
+      }
+
       // Create failure notification
-      await supabase.from('notifications').insert({
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Data Purchase Failed',
         message: `Failed to purchase ${plan.display_name} for ${cleanPhone}. ${apiError}`,
@@ -261,9 +271,9 @@ Deno.serve(async (req) => {
       // Transaction stays pending, will be handled by webhook
     }
 
-    // Update transaction with API response
+    // Update transaction with API response using admin client
     const finalStatus = apiResponse?.status === 'success' ? 'completed' : 'pending'
-    await supabase
+    const { error: updateError } = await adminSupabase
       .from('transactions')
       .update({ 
         status: finalStatus,
@@ -276,16 +286,20 @@ Deno.serve(async (req) => {
       })
       .eq('id', transaction.id)
 
-    // Create notification
+    if (updateError) {
+      console.error('Failed to update transaction status:', updateError)
+    }
+
+    // Create notification using admin client
     if (finalStatus === 'completed') {
-      await supabase.from('notifications').insert({
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Data Purchase Successful',
         message: `${planUsed.display_name} has been sent to ${cleanPhone}`,
         type: 'success'
       })
     } else {
-      await supabase.from('notifications').insert({
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Data Purchase Processing',
         message: `Your ${planUsed.display_name} purchase for ${cleanPhone} is being processed`,
