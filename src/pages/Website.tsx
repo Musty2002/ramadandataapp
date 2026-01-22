@@ -72,7 +72,7 @@ export default function Website() {
   ];
 
   const socialLinks = [
-    { icon: WhatsAppIcon, href: 'https://wa.me/2348012345678', label: 'WhatsApp' },
+    { icon: WhatsAppIcon, href: 'https://wa.me/2347032168097', label: 'WhatsApp' },
     { icon: InstagramIcon, href: 'https://instagram.com/ramadandataapp', label: 'Instagram' },
     { icon: TwitterIcon, href: 'https://twitter.com/ramadandataapp', label: 'Twitter' },
     { icon: FacebookIcon, href: 'https://facebook.com/ramadandataapp', label: 'Facebook' },
