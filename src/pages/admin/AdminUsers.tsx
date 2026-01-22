@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -36,36 +36,32 @@ export default function AdminUsers() {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      if (error) throw error;
-
-      // Fetch wallet balances for each user
-      const usersWithWallets = await Promise.all(
-        (profiles || []).map(async (profile) => {
-          const { data: wallet } = await supabase
-            .from('wallets')
-            .select('balance')
-            .eq('user_id', profile.user_id)
-            .maybeSingle();
-
-          return {
-            ...profile,
-            wallet_balance: wallet?.balance || 0,
-          };
-        })
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data?action=users`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        }
       );
 
-      setUsers(usersWithWallets);
-    } catch (error) {
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch users');
+      }
+
+      setUsers(result.data || []);
+    } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to fetch users',
+        description: error.message || 'Failed to fetch users',
       });
     } finally {
       setLoading(false);
@@ -91,39 +87,30 @@ export default function AdminUsers() {
 
     setFundingLoading(true);
     try {
-      // Get current wallet balance
-      const { data: wallet, error: walletError } = await supabase
-        .from('wallets')
-        .select('balance')
-        .eq('user_id', selectedUser.user_id)
-        .single();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      if (walletError) throw walletError;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data?action=fund-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: selectedUser.user_id,
+            amount,
+            description: fundDescription || 'Manual funding by admin',
+          }),
+        }
+      );
 
-      const newBalance = Number(wallet.balance) + amount;
+      const result = await response.json();
 
-      // Update wallet balance
-      const { error: updateError } = await supabase
-        .from('wallets')
-        .update({ balance: newBalance })
-        .eq('user_id', selectedUser.user_id);
-
-      if (updateError) throw updateError;
-
-      // Create transaction record
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: selectedUser.user_id,
-          type: 'credit',
-          category: 'deposit',
-          amount: amount,
-          description: fundDescription || 'Manual funding by admin',
-          status: 'completed',
-          reference: `ADMIN-FUND-${Date.now()}`,
-        });
-
-      if (transactionError) throw transactionError;
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fund user');
+      }
 
       toast({
         title: 'Success',
