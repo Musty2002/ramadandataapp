@@ -16,6 +16,17 @@
       ],
       "destination": "/website",
       "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin.ramadandataapp.com.ng"
+        }
+      ],
+      "destination": "/admin",
+      "permanent": false
     }
   ]
 }
