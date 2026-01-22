@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { Smartphone, Wifi, Zap, Tv, Shield, Clock, Users, Mail, Phone, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/ramadan-logo.jpeg';
@@ -245,6 +246,8 @@ export default function Website() {
               <ul className="space-y-2 text-sm">
                 <li><a href="#services" className="text-muted-foreground hover:text-primary transition-colors">Services</a></li>
                 <li><a href="#features" className="text-muted-foreground hover:text-primary transition-colors">Why Choose Us</a></li>
+                <li><Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/delete-account" className="text-muted-foreground hover:text-primary transition-colors">Delete Account</Link></li>
               </ul>
             </div>
 
@@ -254,8 +257,8 @@ export default function Website() {
               <ul className="space-y-3 text-sm">
                 <li className="flex items-center gap-2 text-muted-foreground">
                   <Mail className="h-4 w-4 text-primary" />
-                  <a href="mailto:support@ramadandataapp.com" className="hover:text-primary transition-colors">
-                    support@ramadandataapp.com
+                  <a href="mailto:ramadandataapp@gmail.com" className="hover:text-primary transition-colors">
+                    ramadandataapp@gmail.com
                   </a>
                 </li>
                 <li className="flex items-center gap-2 text-muted-foreground">
@@ -300,8 +303,8 @@ export default function Website() {
               © {new Date().getFullYear()} Ramadan Data App. All rights reserved.
             </p>
             <div className="flex gap-4 text-sm">
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</a>
-              <a href="#" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</a>
+              <Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/delete-account" className="text-muted-foreground hover:text-primary transition-colors">Delete Account</Link>
             </div>
           </div>
         </div>
