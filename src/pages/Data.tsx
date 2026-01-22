@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Check, Loader2, Wallet } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TransactionReceipt } from '@/components/TransactionReceipt';
+import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -38,19 +39,36 @@ interface DataPlan {
   category: string;
 }
 
+type Step = 'network' | 'category' | 'plan' | 'confirm';
+
 export default function Data() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [step, setStep] = useState<Step>('network');
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPlan, setSelectedPlan] = useState<DataPlan | null>(null);
   const [phoneNumber, setPhoneNumber] = useState('');
   const [plans, setPlans] = useState<DataPlan[]>([]);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  
+  // Receipt state
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState<{
+    id: string;
+    date: Date;
+    phoneNumber: string;
+    network: string;
+    amount: number;
+    type: 'data';
+    dataPlan: string;
+  } | null>(null);
+  
+  // PIN verification state
+  const [showPinDialog, setShowPinDialog] = useState(false);
 
-  // Fetch plans from database when network changes
   useEffect(() => {
     if (selectedNetwork) {
       fetchPlans(selectedNetwork);
@@ -65,7 +83,6 @@ export default function Data() {
   const fetchPlans = async (network: string) => {
     setLoading(true);
     try {
-      // Fetch all active plans for this network from the database
       const { data, error } = await supabase
         .from('data_plans')
         .select('*')
@@ -78,16 +95,8 @@ export default function Data() {
       const allPlans = (data || []) as unknown as DataPlan[];
       setPlans(allPlans);
       
-      // Extract unique categories
       const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
       setCategories(uniqueCategories);
-      
-      // Set default category
-      if (uniqueCategories.length > 0) {
-        setSelectedCategory(uniqueCategories[0]);
-      } else {
-        setSelectedCategory(null);
-      }
     } catch (error) {
       console.error('Error fetching plans:', error);
       toast({
@@ -100,7 +109,41 @@ export default function Data() {
     }
   };
 
-  const handlePurchase = async () => {
+  const handleNetworkSelect = (networkId: string) => {
+    setSelectedNetwork(networkId);
+    setStep('category');
+  };
+
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    setStep('plan');
+  };
+
+  const handlePlanSelect = (plan: DataPlan) => {
+    setSelectedPlan(plan);
+    setStep('confirm');
+  };
+
+  const handleBack = () => {
+    switch (step) {
+      case 'category':
+        setStep('network');
+        setSelectedNetwork(null);
+        break;
+      case 'plan':
+        setStep('category');
+        setSelectedCategory(null);
+        break;
+      case 'confirm':
+        setStep('plan');
+        setSelectedPlan(null);
+        break;
+      default:
+        navigate('/dashboard');
+    }
+  };
+
+  const initiateTransaction = () => {
     if (!selectedNetwork || !selectedPlan || !phoneNumber) {
       toast({
         variant: 'destructive',
@@ -110,7 +153,6 @@ export default function Data() {
       return;
     }
 
-    // Validate phone number
     const cleanPhone = phoneNumber.replace(/\D/g, '');
     if (cleanPhone.length !== 11) {
       toast({
@@ -121,7 +163,18 @@ export default function Data() {
       return;
     }
 
+    // Check if PIN is setup
+    if (isTransactionPinSetup()) {
+      setShowPinDialog(true);
+    } else {
+      handlePurchase();
+    }
+  };
+
+  const handlePurchase = async () => {
+    setShowPinDialog(false);
     setPurchasing(true);
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -134,28 +187,37 @@ export default function Data() {
         return;
       }
 
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+
       const { data, error } = await supabase.functions.invoke('buy-data', {
         body: {
-          plan_id: selectedPlan.id,
+          plan_id: selectedPlan!.id,
           phone_number: cleanPhone,
         },
       });
 
       if (error) {
-        // Parse edge function error
         const errorMessage = error.message || 'Purchase failed';
         throw new Error(errorMessage);
       }
 
       if (data?.success) {
+        // Show receipt
+        setLastTransaction({
+          id: data.transaction_id || crypto.randomUUID(),
+          date: new Date(),
+          phoneNumber: cleanPhone,
+          network: selectedNetwork!,
+          amount: selectedPlan!.selling_price,
+          type: 'data',
+          dataPlan: selectedPlan!.display_name || selectedPlan!.data_amount || selectedPlan!.name,
+        });
+        setShowReceipt(true);
+        
         toast({
           title: 'Success',
           description: data.message,
         });
-        // Reset form
-        setSelectedPlan(null);
-        setPhoneNumber('');
-        navigate('/history');
       } else {
         throw new Error(data?.error || data?.details || 'Purchase failed');
       }
@@ -163,7 +225,6 @@ export default function Data() {
       console.error('Purchase error:', error);
       const message = error instanceof Error ? error.message : 'Failed to purchase data. Please try again.';
       
-      // Check for insufficient balance error
       const isInsufficientBalance = message.toLowerCase().includes('insufficient balance');
       
       toast({
@@ -183,6 +244,15 @@ export default function Data() {
     }
   };
 
+  const handleReceiptClose = () => {
+    setShowReceipt(false);
+    setSelectedPlan(null);
+    setPhoneNumber('');
+    setStep('network');
+    setSelectedNetwork(null);
+    navigate('/history');
+  };
+
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -195,9 +265,9 @@ export default function Data() {
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      sme: 'SME',
+      sme: 'SME Data',
       corporate: 'Corporate',
-      awoof: 'Awoof',
+      awoof: 'Awoof Data',
       coupon: 'Coupon',
       gifting: 'Gifting',
       datashare: 'DataShare',
@@ -205,75 +275,122 @@ export default function Data() {
     return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
   };
 
+  const getStepTitle = () => {
+    switch (step) {
+      case 'network': return 'Select Network';
+      case 'category': return 'Select Category';
+      case 'plan': return 'Select Data Plan';
+      case 'confirm': return 'Confirm Purchase';
+    }
+  };
+
+  const networkData = networks.find(n => n.id === selectedNetwork);
+
   return (
     <MobileLayout showNav={false}>
       <div className="safe-area-top">
         {/* Header */}
         <div className="flex items-center gap-4 px-4 py-4">
-          <button onClick={() => navigate('/dashboard')} className="p-2 -ml-2">
+          <button onClick={handleBack} className="p-2 -ml-2">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="text-lg font-bold text-foreground">Buy Data</h1>
+          <h1 className="text-lg font-bold text-foreground">{getStepTitle()}</h1>
+        </div>
+
+        {/* Step indicator */}
+        <div className="px-4 mb-6">
+          <div className="flex items-center justify-between max-w-xs mx-auto">
+            {['network', 'category', 'plan', 'confirm'].map((s, i) => {
+              const stepIndex = ['network', 'category', 'plan', 'confirm'].indexOf(step);
+              const isActive = i <= stepIndex;
+              const isCurrent = s === step;
+              return (
+                <div key={s} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
+                    isCurrent 
+                      ? 'bg-primary text-primary-foreground scale-110' 
+                      : isActive 
+                        ? 'bg-primary/20 text-primary' 
+                        : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  {i < 3 && (
+                    <div className={`w-8 h-0.5 ${isActive && i < stepIndex ? 'bg-primary' : 'bg-muted'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="px-4 pb-6">
-          {/* Network Selection */}
-          <div className="mb-6">
-            <Label className="mb-3 block">Select Network</Label>
-            <div className="grid grid-cols-4 gap-3">
+          {/* Step 1: Network Selection */}
+          {step === 'network' && (
+            <div className="grid grid-cols-2 gap-4">
               {networks.map((network) => (
                 <button
                   key={network.id}
-                  onClick={() => setSelectedNetwork(network.id)}
-                  className={`p-3 rounded-xl border-2 transition-all ${
-                    selectedNetwork === network.id
-                      ? 'border-primary bg-primary/5 shadow-md'
-                      : 'border-border bg-card hover:border-primary/50'
-                  }`}
+                  onClick={() => handleNetworkSelect(network.id)}
+                  className="p-6 rounded-2xl border-2 transition-all bg-card hover:border-primary/50 hover:shadow-md active:scale-95"
                 >
-                  <div className={`w-12 h-12 rounded-full mx-auto mb-2 overflow-hidden shadow-sm ring-2 ring-offset-2 ring-offset-background ${
-                    selectedNetwork === network.id ? 'ring-primary' : 'ring-transparent'
-                  }`}>
+                  <div className="w-16 h-16 rounded-full mx-auto mb-3 overflow-hidden shadow-md">
                     <img 
                       src={network.logo} 
                       alt={`${network.name} logo`}
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <p className="text-xs font-medium text-center">{network.name}</p>
+                  <p className="text-sm font-semibold text-center">{network.name}</p>
                 </button>
               ))}
             </div>
-          </div>
+          )}
 
-          {/* Category Tabs - Show after network selection */}
-          {selectedNetwork && categories.length > 0 && (
-            <div className="mb-6">
-              <Label className="mb-3 block">Select Category</Label>
-              <Tabs value={selectedCategory || ''} onValueChange={setSelectedCategory}>
-                <TabsList className="w-full grid" style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, 1fr)` }}>
-                  {categories.map((cat) => (
-                    <TabsTrigger key={cat} value={cat} className="text-xs">
-                      {getCategoryLabel(cat)}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
+          {/* Step 2: Category Selection */}
+          {step === 'category' && (
+            <div className="space-y-3">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-muted-foreground">Loading categories...</span>
+                </div>
+              ) : categories.length === 0 ? (
+                <p className="text-center text-muted-foreground py-8">
+                  No data plans available for this network
+                </p>
+              ) : (
+                categories.map((category) => (
+                  <button
+                    key={category}
+                    onClick={() => handleCategorySelect(category)}
+                    className="w-full p-4 rounded-xl border-2 bg-card flex items-center justify-between hover:border-primary/50 hover:shadow-sm transition-all active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-3">
+                      {networkData && (
+                        <div className="w-10 h-10 rounded-full overflow-hidden">
+                          <img src={networkData.logo} alt={networkData.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <span className="font-semibold">{getCategoryLabel(category)}</span>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                ))
+              )}
             </div>
           )}
 
-          {/* Data Plans - Show after category selection */}
-          {selectedNetwork && selectedCategory && (
-            <div className="mb-6">
-              <Label className="mb-3 block">Select Data Bundle</Label>
-              
+          {/* Step 3: Plan Selection */}
+          {step === 'plan' && (
+            <div className="space-y-3">
               {loading ? (
-                <div className="flex items-center justify-center py-8">
+                <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   <span className="ml-2 text-muted-foreground">Loading plans...</span>
                 </div>
               ) : filteredPlans.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">
+                <p className="text-center text-muted-foreground py-8">
                   No plans available for this category
                 </p>
               ) : (
@@ -281,18 +398,9 @@ export default function Data() {
                   {filteredPlans.map((plan) => (
                     <button
                       key={plan.id}
-                      onClick={() => setSelectedPlan(plan)}
-                      className={`p-4 rounded-xl border-2 text-left transition-all relative ${
-                        selectedPlan?.id === plan.id
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card'
-                      }`}
+                      onClick={() => handlePlanSelect(plan)}
+                      className="p-4 rounded-xl border-2 text-left transition-all bg-card hover:border-primary/50 hover:shadow-sm active:scale-[0.98]"
                     >
-                      {selectedPlan?.id === plan.id && (
-                        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-primary flex items-center justify-center">
-                          <Check className="w-3 h-3 text-primary-foreground" />
-                        </div>
-                      )}
                       <p className="text-lg font-bold text-foreground">{plan.data_amount || plan.name}</p>
                       <p className="text-xs text-muted-foreground">{plan.validity}</p>
                       <p className="text-sm font-semibold text-primary mt-2">
@@ -305,55 +413,84 @@ export default function Data() {
             </div>
           )}
 
-          {/* Phone Number - Show after plan selection */}
-          {selectedPlan && (
-            <div className="mb-6">
-              <Label htmlFor="phone">Phone Number</Label>
-              <Input
-                id="phone"
-                type="tel"
-                placeholder="08012345678"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                className="mt-2"
-                maxLength={11}
-              />
-            </div>
-          )}
-
-          {/* Selected Plan Summary */}
-          {selectedPlan && (
-            <div className="mb-4 p-4 rounded-xl bg-muted/50 border border-border">
-              <div className="flex justify-between items-center">
-                <div>
-                  <p className="text-sm text-muted-foreground">Selected Plan</p>
-                  <p className="font-semibold">{selectedPlan.display_name}</p>
+          {/* Step 4: Confirm */}
+          {step === 'confirm' && selectedPlan && (
+            <div className="space-y-6">
+              {/* Selected plan summary */}
+              <div className="p-4 rounded-2xl bg-primary/5 border-2 border-primary/20">
+                <div className="flex items-center gap-3 mb-4">
+                  {networkData && (
+                    <div className="w-12 h-12 rounded-full overflow-hidden shadow-md">
+                      <img src={networkData.logo} alt={networkData.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold">{networkData?.name}</p>
+                    <p className="text-sm text-muted-foreground">{getCategoryLabel(selectedCategory || '')}</p>
+                  </div>
                 </div>
-                <p className="text-lg font-bold text-primary">
-                  {formatPrice(selectedPlan.selling_price)}
-                </p>
+                
+                <div className="flex justify-between items-center pt-3 border-t border-primary/20">
+                  <div>
+                    <p className="text-lg font-bold">{selectedPlan.data_amount || selectedPlan.name}</p>
+                    <p className="text-xs text-muted-foreground">{selectedPlan.validity}</p>
+                  </div>
+                  <p className="text-2xl font-bold text-primary">
+                    {formatPrice(selectedPlan.selling_price)}
+                  </p>
+                </div>
               </div>
+
+              {/* Phone number input */}
+              <div>
+                <Label htmlFor="phone" className="text-base font-semibold">Phone Number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  placeholder="08012345678"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  className="mt-2 h-12 text-lg"
+                  maxLength={11}
+                />
+              </div>
+
+              {/* Purchase Button */}
+              <Button
+                className="w-full h-14 text-lg font-semibold"
+                onClick={initiateTransaction}
+                disabled={!phoneNumber || purchasing}
+              >
+                {purchasing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  `Pay ${formatPrice(selectedPlan.selling_price)}`
+                )}
+              </Button>
             </div>
           )}
-
-          {/* Purchase Button */}
-          <Button
-            className="w-full"
-            size="lg"
-            onClick={handlePurchase}
-            disabled={!selectedNetwork || !selectedPlan || !phoneNumber || purchasing}
-          >
-            {purchasing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              'Buy Data'
-            )}
-          </Button>
         </div>
       </div>
+
+      {/* Transaction PIN Dialog */}
+      <TransactionPinDialog
+        open={showPinDialog}
+        onOpenChange={setShowPinDialog}
+        onComplete={handlePurchase}
+        mode="verify"
+      />
+
+      {/* Transaction Receipt */}
+      {lastTransaction && (
+        <TransactionReceipt
+          open={showReceipt}
+          onClose={handleReceiptClose}
+          transaction={lastTransaction}
+        />
+      )}
     </MobileLayout>
   );
 }
