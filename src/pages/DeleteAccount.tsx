@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { FloatingWhatsApp } from '@/components/website/FloatingWhatsApp';
 import logo from '@/assets/ramadan-logo.jpeg';
 import { z } from 'zod';
 
@@ -198,6 +199,9 @@ export default function DeleteAccount() {
           </p>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <FloatingWhatsApp />
     </div>
   );
 }

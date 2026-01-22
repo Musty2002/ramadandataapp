@@ -1,5 +1,6 @@
 import { ArrowLeft, Mail, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { FloatingWhatsApp } from '@/components/website/FloatingWhatsApp';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function PrivacyPolicy() {
@@ -170,6 +171,9 @@ export default function PrivacyPolicy() {
           </p>
         </div>
       </footer>
+
+      {/* Floating WhatsApp Button */}
+      <FloatingWhatsApp />
     </div>
   );
 }
