@@ -399,7 +399,12 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
       return { error: 'Plan mapping missing (product_id). Please choose another plan.' }
     }
 
-    // RGC API expects 'plan' (product_id) and 'mobile_number' fields
+    // RGC API expects 'plan' as integer (product_id) and 'mobile_number' fields
+    // The documentation shows: { "plan": 6, "mobile_number": "08012345678" }
+    const planId = parseInt(plan.product_id, 10)
+    
+    console.log('RGC request body:', { plan: planId, mobile_number: phoneNumber })
+    
     const response = await fetch('https://api.rgcdata.com.ng/api/v2/purchase/data', {
       method: 'POST',
       headers: {
@@ -407,9 +412,8 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        plan: plan.product_id,
-        mobile_number: phoneNumber,
-        reference: reference
+        plan: planId,
+        mobile_number: phoneNumber
       })
     })
 
