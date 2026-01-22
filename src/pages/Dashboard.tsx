@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
-import { AppLockSetupDialog, isAppLockPinSetup } from '@/components/auth/AppLockSetupDialog';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
@@ -19,36 +18,18 @@ export default function Dashboard() {
   const [refreshTick, setRefreshTick] = useState(0);
   
   // PIN setup states
-  const [showAppLockSetup, setShowAppLockSetup] = useState(false);
   const [showTransactionPinSetup, setShowTransactionPinSetup] = useState(false);
 
-  // Check if PINs need to be set up on first load
+  // Check if transaction PIN needs to be set up on first load
   useEffect(() => {
     const checkPinSetup = () => {
-      // First check app lock PIN (6-digit)
-      if (!isAppLockPinSetup()) {
-        setTimeout(() => setShowAppLockSetup(true), 1000);
-      } else if (!isTransactionPinSetup()) {
-        // Then check transaction PIN (4-digit)
+      if (!isTransactionPinSetup()) {
         setTimeout(() => setShowTransactionPinSetup(true), 1000);
       }
     };
 
     checkPinSetup();
   }, []);
-
-  const handleAppLockComplete = () => {
-    toast({
-      title: 'App Lock PIN Set',
-      description: 'Your 6-digit app lock PIN has been created.',
-    });
-    setShowAppLockSetup(false);
-    
-    // Now check if transaction PIN needs setup
-    if (!isTransactionPinSetup()) {
-      setTimeout(() => setShowTransactionPinSetup(true), 500);
-    }
-  };
 
   const handleTransactionPinComplete = () => {
     toast({
@@ -94,13 +75,6 @@ export default function Dashboard() {
           <RecentTransactions refreshTick={refreshTick} />
         </div>
       </PullToRefresh>
-
-      {/* App Lock PIN Setup Dialog (6-digit) */}
-      <AppLockSetupDialog
-        open={showAppLockSetup}
-        onOpenChange={setShowAppLockSetup}
-        onComplete={handleAppLockComplete}
-      />
 
       {/* Transaction PIN Setup Dialog (4-digit) */}
       <TransactionPinDialog
