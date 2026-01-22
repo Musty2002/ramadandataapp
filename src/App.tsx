@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AppLockWrapper } from "@/components/auth/AppLockWrapper";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -11,6 +12,10 @@ import Dashboard from "./pages/Dashboard";
 import Services from "./pages/Services";
 import History from "./pages/History";
 import Profile from "./pages/Profile";
+import EditProfile from "./pages/EditProfile";
+import Security from "./pages/Security";
+import Support from "./pages/Support";
+import Settings from "./pages/Settings";
 import Referral from "./pages/Referral";
 import Data from "./pages/Data";
 import Airtime from "./pages/Airtime";
@@ -118,6 +123,38 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/profile/edit"
+        element={
+          <ProtectedRoute>
+            <EditProfile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/security"
+        element={
+          <ProtectedRoute>
+            <Security />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/support"
+        element={
+          <ProtectedRoute>
+            <Support />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/referral"
         element={
           <ProtectedRoute>
@@ -220,7 +257,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <AppLockWrapper>
+            <AppRoutes />
+          </AppLockWrapper>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
