@@ -80,7 +80,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/website" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/website" element={<Website />} />
       <Route
         path="/auth"
