@@ -58,7 +58,7 @@ export function TransactionReceipt({ open, onClose, transaction }: TransactionRe
   const generateTransactionId = () => {
     const dateStr = format(transaction.date, 'yyyyMMdd');
     const randomStr = transaction.id?.substring(0, 8).toUpperCase() || Math.random().toString(36).substring(2, 8).toUpperCase();
-    return `RDS-${dateStr}-${randomStr}`;
+    return `RDA-${dateStr}-${randomStr}`;
   };
 
   const formatCurrency = (amount: number) => {
@@ -275,7 +275,7 @@ export function TransactionReceipt({ open, onClose, transaction }: TransactionRe
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 mt-6 pt-4 border-t border-dashed border-gray-200">
             <img src={logo} alt="Logo" className="w-8 h-8 rounded-full" />
-            <span className="text-sm font-semibold text-gray-600">RDS Data</span>
+            <span className="text-sm font-semibold text-gray-600">Ramadan Data App</span>
           </div>
         </div>
 
