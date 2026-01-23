@@ -387,8 +387,13 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
       }
     }
 
+    // iSquare returns various success indicators
+    const isSuccess = data.status === 'success' || data.status === 'completed' || 
+                      data.message?.toLowerCase().includes('success') ||
+                      (response.ok && !data.error && data.transaction_id);
+    
     return {
-      status: data.status === 'success' ? 'success' : 'pending',
+      status: isSuccess ? 'success' : 'pending',
       transaction_id: data.transaction_id || data.id,
       raw: data
     }
@@ -448,8 +453,13 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
       }
     }
 
+    // RGC returns various success indicators
+    const isSuccess = data.status === 'success' || data.status === 'completed' || 
+                      data.message?.toLowerCase().includes('success') ||
+                      (response.ok && !data.error && (data.transaction_id || data.id));
+    
     return {
-      status: data.status === 'success' ? 'success' : 'pending',
+      status: isSuccess ? 'success' : 'pending',
       transaction_id: data.transaction_id || data.id,
       raw: data
     }
