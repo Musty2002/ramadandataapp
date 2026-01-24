@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
 
 interface CableProvider {
   id: string;
@@ -136,18 +138,20 @@ export default function TV() {
           description: `Customer: ${data.customer_name}`,
         });
       } else {
+        const errorInfo = getApiErrorMessage(data);
         toast({
           variant: 'destructive',
           title: 'Verification Failed',
-          description: data.error || 'Could not verify smartcard number',
+          description: errorInfo.description,
         });
       }
     } catch (error) {
       console.error('Verification error:', error);
+      const errorInfo = parseError(error);
       toast({
         variant: 'destructive',
-        title: 'Verification Failed',
-        description: 'Could not verify smartcard. Please try again.',
+        title: errorInfo.title,
+        description: errorInfo.description,
       });
     } finally {
       setIsVerifying(false);
@@ -171,7 +175,12 @@ export default function TV() {
       toast({
         variant: 'destructive',
         title: 'Insufficient Balance',
-        description: 'Please fund your wallet',
+        description: "You don't have enough funds in your wallet.",
+        action: (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ),
       });
       return;
     }
@@ -204,22 +213,34 @@ export default function TV() {
       if (data.success) {
         toast({
           title: 'Subscription Successful!',
-          description: data.message,
+          description: data.message || 'Your TV subscription has been renewed.',
         });
         navigate('/history');
       } else {
+        const errorInfo = getApiErrorMessage(data);
         toast({
           variant: 'destructive',
           title: 'Subscription Failed',
-          description: data.error || 'Failed to subscribe',
+          description: errorInfo.description,
+          action: errorInfo.isInsufficientBalance ? (
+            <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+              Add Money
+            </ToastAction>
+          ) : undefined,
         });
       }
     } catch (error) {
       console.error('Purchase error:', error);
+      const errorInfo = parseError(error);
       toast({
         variant: 'destructive',
-        title: 'Subscription Failed',
-        description: 'An error occurred. Please try again.',
+        title: errorInfo.title,
+        description: errorInfo.description,
+        action: errorInfo.isInsufficientBalance ? (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ) : undefined,
       });
     } finally {
       setIsPurchasing(false);

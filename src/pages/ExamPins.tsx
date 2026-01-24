@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
+import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
 
 interface ExamPin {
   id: string;
@@ -72,7 +74,12 @@ export default function ExamPins() {
       toast({
         variant: 'destructive',
         title: 'Insufficient Balance',
-        description: 'Please fund your wallet',
+        description: "You don't have enough funds in your wallet.",
+        action: (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ),
       });
       return;
     }
@@ -105,22 +112,34 @@ export default function ExamPins() {
         setPurchasedPins(data.pins);
         toast({
           title: 'Purchase Successful!',
-          description: `${data.pins.length} PIN(s) purchased`,
+          description: `${data.pins.length} PIN(s) purchased successfully.`,
         });
         fetchBalance();
       } else {
+        const errorInfo = getApiErrorMessage(data);
         toast({
           variant: 'destructive',
           title: 'Purchase Failed',
-          description: data.error || 'Failed to purchase PIN',
+          description: errorInfo.description,
+          action: errorInfo.isInsufficientBalance ? (
+            <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+              Add Money
+            </ToastAction>
+          ) : undefined,
         });
       }
     } catch (error) {
       console.error('Purchase error:', error);
+      const errorInfo = parseError(error);
       toast({
         variant: 'destructive',
-        title: 'Purchase Failed',
-        description: 'An error occurred. Please try again.',
+        title: errorInfo.title,
+        description: errorInfo.description,
+        action: errorInfo.isInsufficientBalance ? (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ) : undefined,
       });
     } finally {
       setIsPurchasing(false);
