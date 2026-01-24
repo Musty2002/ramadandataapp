@@ -5,11 +5,13 @@ interface ErrorInfo {
 }
 
 // Common error patterns and their friendly messages
+// IMPORTANT: Order matters! More specific patterns should come first
 const ERROR_PATTERNS: { pattern: RegExp | string; title: string; message: string; isBalance?: boolean }[] = [
+  // Balance-related errors - check these FIRST (highest priority)
   {
     pattern: /insufficient (balance|funds|wallet)/i,
     title: 'Insufficient Balance',
-    message: "You don't have enough funds in your wallet.",
+    message: "You don't have enough funds in your wallet. Please add money to continue.",
     isBalance: true,
   },
   {
@@ -25,64 +27,84 @@ const ERROR_PATTERNS: { pattern: RegExp | string; title: string; message: string
     isBalance: true,
   },
   {
-    pattern: /edge function/i,
-    title: 'Service Temporarily Unavailable',
-    message: 'Please try again in a few moments.',
+    pattern: /balance.*insufficient|wallet.*empty/i,
+    title: 'Insufficient Balance',
+    message: "You don't have enough funds in your wallet.",
+    isBalance: true,
   },
+  // Plan/Product errors
   {
-    pattern: /network (error|failed|timeout)/i,
-    title: 'Connection Error',
-    message: 'Please check your internet connection and try again.',
-  },
-  {
-    pattern: /timeout/i,
-    title: 'Request Timeout',
-    message: 'The request took too long. Please try again.',
-  },
-  {
-    pattern: /not authenticated|auth.*error|session/i,
-    title: 'Session Expired',
-    message: 'Please log in again to continue.',
+    pattern: /plan.*not (found|available|active)|plan.*unavailable|bundle.*unavailable/i,
+    title: 'Plan Unavailable',
+    message: 'This plan is no longer available. Please select another.',
   },
   {
     pattern: /invalid (phone|number|meter|smartcard|iuc)/i,
     title: 'Invalid Number',
     message: 'Please check the number you entered and try again.',
   },
+  // Authentication errors
   {
-    pattern: /plan.*not (found|available|active)/i,
-    title: 'Plan Unavailable',
-    message: 'This plan is no longer available. Please select another.',
+    pattern: /not authenticated|auth.*error|session.*expired|unauthorized/i,
+    title: 'Session Expired',
+    message: 'Please log in again to continue.',
   },
+  // Provider/API errors
   {
-    pattern: /provider.*error|api.*error|external.*service/i,
+    pattern: /provider.*error|api.*error|external.*service|provider.*issue/i,
     title: 'Service Provider Error',
     message: 'The service provider is having issues. Please try again later.',
   },
   {
-    pattern: /verification failed/i,
+    pattern: /verification failed|could not verify/i,
     title: 'Verification Failed',
     message: 'Could not verify the details. Please check and try again.',
   },
+  // Transaction errors
   {
     pattern: /duplicate|already.*processed/i,
     title: 'Duplicate Transaction',
     message: 'This transaction may have already been processed. Check your history.',
   },
   {
-    pattern: /maintenance|unavailable/i,
-    title: 'Service Maintenance',
-    message: 'This service is temporarily under maintenance. Please try again later.',
+    pattern: /transaction.*failed|purchase.*failed/i,
+    title: 'Transaction Failed',
+    message: 'The transaction could not be completed. Please try again.',
   },
+  // Network/Connection errors
+  {
+    pattern: /network (error|failed|timeout)/i,
+    title: 'Connection Error',
+    message: 'Please check your internet connection and try again.',
+  },
+  {
+    pattern: /timeout|timed out/i,
+    title: 'Request Timeout',
+    message: 'The request took too long. Please try again.',
+  },
+  {
+    pattern: /failed to fetch|fetch error|connection.*refused/i,
+    title: 'Connection Error',
+    message: 'Could not connect to the server. Please check your internet.',
+  },
+  // Rate limiting
   {
     pattern: /rate limit|too many requests/i,
     title: 'Too Many Requests',
     message: 'Please wait a moment before trying again.',
   },
+  // Maintenance (keep this near the end)
   {
-    pattern: /failed to fetch|fetch error/i,
-    title: 'Connection Error',
-    message: 'Could not connect to the server. Please check your internet.',
+    pattern: /maintenance|service.*unavailable/i,
+    title: 'Service Maintenance',
+    message: 'This service is temporarily under maintenance. Please try again later.',
+  },
+  // Edge function generic error - keep this LAST as a fallback
+  // Only match if no other specific error was found
+  {
+    pattern: /^edge function.*error$|^function.*error$/i,
+    title: 'Service Temporarily Unavailable',
+    message: 'Please try again in a few moments.',
   },
 ];
 
@@ -97,7 +119,22 @@ export function parseError(error: unknown): ErrorInfo {
   } else if (typeof error === 'string') {
     errorMessage = error;
   } else if (error && typeof error === 'object') {
-    errorMessage = (error as any).message || (error as any).error || JSON.stringify(error);
+    // Try to extract nested error messages
+    const errorObj = error as any;
+    errorMessage = errorObj.message || errorObj.error || errorObj.details || JSON.stringify(error);
+  }
+  
+  // Clean up edge function wrapper to get actual error
+  // e.g., "Edge Function returned error: Insufficient balance" -> "Insufficient balance"
+  const edgeFunctionMatch = errorMessage.match(/edge function.*?(?:returned|error)[:\s]*(.+)/i);
+  if (edgeFunctionMatch && edgeFunctionMatch[1]) {
+    errorMessage = edgeFunctionMatch[1].trim();
+  }
+  
+  // Also try to extract from "Error: <actual message>" format
+  const errorPrefixMatch = errorMessage.match(/^error:\s*(.+)/i);
+  if (errorPrefixMatch && errorPrefixMatch[1]) {
+    errorMessage = errorPrefixMatch[1].trim();
   }
   
   // Check against known patterns
