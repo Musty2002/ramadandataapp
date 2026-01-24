@@ -26,3 +26,9 @@ verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = false
+
+[functions.admin-data]
+verify_jwt = false
+
+[functions.sync-data-plans]
+verify_jwt = false

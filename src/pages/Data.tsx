@@ -10,7 +10,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
-import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
+
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -229,13 +229,18 @@ export default function Data() {
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);
-      const errorInfo = parseError(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check for insufficient balance
+      const isInsufficientBalance = /insufficient (balance|funds)/i.test(errorMessage);
       
       toast({
         variant: 'destructive',
-        title: errorInfo.title,
-        description: errorInfo.description,
-        action: errorInfo.isInsufficientBalance ? (
+        title: isInsufficientBalance ? 'Insufficient Balance' : 'Purchase Failed',
+        description: isInsufficientBalance 
+          ? "You don't have enough funds in your wallet. Please add money to continue."
+          : errorMessage || 'Failed to purchase data. Please try again.',
+        action: isInsufficientBalance ? (
           <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
             Add Money
           </ToastAction>

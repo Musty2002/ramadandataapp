@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
-import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
+
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -155,13 +155,15 @@ export default function Airtime() {
         },
       });
 
-      // Check for SDK-level errors
+      // Handle SDK-level errors (network issues, etc.)
       if (error) {
+        console.error('SDK error:', error);
         throw new Error(error.message || 'Purchase failed');
       }
 
-      // Check for API-level errors (returned in data.error)
+      // Handle API-level errors returned in the response body
       if (data?.error) {
+        console.error('API error:', data.error);
         throw new Error(data.error);
       }
 
@@ -178,13 +180,18 @@ export default function Airtime() {
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);
-      const errorInfo = parseError(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check for insufficient balance
+      const isInsufficientBalance = /insufficient (balance|funds)/i.test(errorMessage);
       
       toast({
         variant: 'destructive',
-        title: errorInfo.title,
-        description: errorInfo.description,
-        action: errorInfo.isInsufficientBalance ? (
+        title: isInsufficientBalance ? 'Insufficient Balance' : 'Purchase Failed',
+        description: isInsufficientBalance 
+          ? "You don't have enough funds in your wallet. Please add money to continue."
+          : errorMessage || 'Failed to purchase airtime. Please try again.',
+        action: isInsufficientBalance ? (
           <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
             Add Money
           </ToastAction>
@@ -216,7 +223,7 @@ export default function Airtime() {
       <div className="safe-area-top">
         {/* Header */}
         <div className="flex items-center gap-4 px-4 py-4">
-          <button onClick={() => navigate(-1)} className="p-2 -ml-2">
+          <button onClick={() => navigate('/dashboard')} className="p-2 -ml-2">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="text-lg font-bold text-foreground">Buy Airtime</h1>
