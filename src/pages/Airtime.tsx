@@ -155,8 +155,14 @@ export default function Airtime() {
         },
       });
 
+      // Check for SDK-level errors
       if (error) {
         throw new Error(error.message || 'Purchase failed');
+      }
+
+      // Check for API-level errors (returned in data.error)
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       if (data?.success) {
@@ -168,8 +174,7 @@ export default function Airtime() {
         setAmount('');
         navigate('/history');
       } else {
-        const errorInfo = getApiErrorMessage(data);
-        throw new Error(errorInfo.description);
+        throw new Error(data?.details || 'Purchase failed');
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);

@@ -121,14 +121,43 @@ export function parseError(error: unknown): ErrorInfo {
   } else if (error && typeof error === 'object') {
     // Try to extract nested error messages
     const errorObj = error as any;
-    errorMessage = errorObj.message || errorObj.error || errorObj.details || JSON.stringify(error);
+    errorMessage = errorObj.error || errorObj.message || errorObj.details || JSON.stringify(error);
+  }
+  
+  // Try to parse JSON error strings like '{"error":"Insufficient balance"}'
+  if (errorMessage.startsWith('{') && errorMessage.includes('"error"')) {
+    try {
+      const parsed = JSON.parse(errorMessage);
+      if (parsed.error) {
+        errorMessage = parsed.error;
+      }
+    } catch {
+      // Not valid JSON, continue with original message
+    }
   }
   
   // Clean up edge function wrapper to get actual error
-  // e.g., "Edge Function returned error: Insufficient balance" -> "Insufficient balance"
-  const edgeFunctionMatch = errorMessage.match(/edge function.*?(?:returned|error)[:\s]*(.+)/i);
+  // e.g., "Edge Function returned 400: Error, {"error":"Insufficient balance"}" -> "Insufficient balance"
+  const edgeFunctionMatch = errorMessage.match(/edge function.*?(?:returned|error)[^{]*(?:\{[^}]*"error"\s*:\s*"([^"]+)")?/i);
   if (edgeFunctionMatch && edgeFunctionMatch[1]) {
     errorMessage = edgeFunctionMatch[1].trim();
+  } else {
+    // Simpler extraction: get content after colon if it looks like "Error: message"
+    const simpleMatch = errorMessage.match(/:\s*(?:Error,?\s*)?(.+)/i);
+    if (simpleMatch && simpleMatch[1]) {
+      const extracted = simpleMatch[1].trim();
+      // Try to extract from JSON in the extracted part
+      if (extracted.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(extracted);
+          if (parsed.error) {
+            errorMessage = parsed.error;
+          }
+        } catch {
+          // Not valid JSON
+        }
+      }
+    }
   }
   
   // Also try to extract from "Error: <actual message>" format
