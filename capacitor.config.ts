@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.f2d268fbd29f46e2885d9cb4b456af13',
-  appName: 'RDS Data',
+  appId: 'com.ramadandata.app',
+  appName: 'Ramadan Data',
   webDir: 'dist',
   server: {
     url: 'https://f2d268fb-d29f-46e2-885d-9cb4b456af13.lovableproject.com?forceHideBadge=true',

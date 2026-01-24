@@ -39,6 +39,7 @@ import AdminTransactions from "./pages/admin/AdminTransactions";
 import AdminDataPlans from "./pages/admin/AdminDataPlans";
 import AdminAirtimePlans from "./pages/admin/AdminAirtimePlans";
 import AdminSettings from "./pages/admin/AdminSettings";
+import AdminNotifications from "./pages/admin/AdminNotifications";
 
 
 const queryClient = new QueryClient();
@@ -253,7 +254,7 @@ function AppRoutes() {
       <Route path="/admin/transactions" element={<AdminTransactions />} />
       <Route path="/admin/data-plans" element={<AdminDataPlans />} />
       <Route path="/admin/airtime-plans" element={<AdminAirtimePlans />} />
-      
+      <Route path="/admin/notifications" element={<AdminNotifications />} />
       <Route path="/admin/settings" element={<AdminSettings />} />
       
       <Route path="*" element={<NotFound />} />
