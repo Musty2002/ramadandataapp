@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
+import { WhatsAppButton } from '@/components/dashboard/WhatsAppButton';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
@@ -75,6 +76,9 @@ export default function Dashboard() {
           <RecentTransactions refreshTick={refreshTick} />
         </div>
       </PullToRefresh>
+
+      {/* WhatsApp Button */}
+      <WhatsAppButton />
 
       {/* Transaction PIN Setup Dialog (4-digit) */}
       <TransactionPinDialog
