@@ -5,8 +5,11 @@ const config: CapacitorConfig = {
   appName: 'Ramadan Data',
   webDir: 'dist',
   server: {
-    url: 'https://f2d268fb-d29f-46e2-885d-9cb4b456af13.lovableproject.com?forceHideBadge=true',
-    cleartext: true
+    // Use the preview URL for hot-reload during development
+    url: 'https://id-preview--f2d268fb-d29f-46e2-885d-9cb4b456af13.lovable.app?forceHideBadge=true',
+    cleartext: true,
+    // Prevent external URL navigation
+    allowNavigation: ['*.lovable.app', '*.supabase.co']
   },
   plugins: {
     SplashScreen: {
@@ -43,11 +46,14 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
+    webContentsDebuggingEnabled: true,
+    // Ensure app handles all navigation internally
+    initialFocus: true,
   },
   ios: {
     contentInset: 'automatic',
     scrollEnabled: true,
+    allowsLinkPreview: false,
   },
 };
 
