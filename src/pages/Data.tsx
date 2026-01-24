@@ -10,6 +10,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
+import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -196,9 +197,14 @@ export default function Data() {
         },
       });
 
+      // Check for SDK-level errors
       if (error) {
-        const errorMessage = error.message || 'Purchase failed';
-        throw new Error(errorMessage);
+        throw new Error(error.message || 'Purchase failed');
+      }
+
+      // Check for API-level errors (returned in data.error)
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
       if (data?.success) {
@@ -216,24 +222,20 @@ export default function Data() {
         
         toast({
           title: 'Success',
-          description: data.message,
+          description: data.message || 'Data purchase successful!',
         });
       } else {
-        throw new Error(data?.error || data?.details || 'Purchase failed');
+        throw new Error(data?.details || 'Purchase failed');
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to purchase data. Please try again.';
-      
-      const isInsufficientBalance = message.toLowerCase().includes('insufficient balance');
+      const errorInfo = parseError(error);
       
       toast({
         variant: 'destructive',
-        title: isInsufficientBalance ? 'Insufficient Balance' : 'Purchase Failed',
-        description: isInsufficientBalance 
-          ? 'You don\'t have enough funds. Tap below to add money to your wallet.'
-          : message,
-        action: isInsufficientBalance ? (
+        title: errorInfo.title,
+        description: errorInfo.description,
+        action: errorInfo.isInsufficientBalance ? (
           <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
             Add Money
           </ToastAction>
