@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -39,6 +40,8 @@ export default function Airtime() {
   const [amount, setAmount] = useState('');
   const [purchasing, setPurchasing] = useState(false);
   const [bestPlan, setBestPlan] = useState<AirtimePlan | null>(null);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [pendingPurchase, setPendingPurchase] = useState(false);
 
   // Fetch best airtime plan when network changes
   useEffect(() => {
@@ -72,14 +75,14 @@ export default function Airtime() {
     }
   };
 
-  const handlePurchase = async () => {
+  const validateForm = () => {
     if (!selectedNetwork || !phoneNumber || !amount) {
       toast({
         variant: 'destructive',
         title: 'Missing Information',
         description: 'Please fill in all fields',
       });
-      return;
+      return false;
     }
 
     const amountNum = parseFloat(amount);
@@ -89,7 +92,7 @@ export default function Airtime() {
         title: 'Invalid Amount',
         description: 'Minimum airtime amount is ₦50',
       });
-      return;
+      return false;
     }
 
     // Validate phone number
@@ -100,10 +103,36 @@ export default function Airtime() {
         title: 'Invalid Phone Number',
         description: 'Please enter a valid 11-digit phone number',
       });
-      return;
+      return false;
     }
 
+    return true;
+  };
+
+  const handlePurchaseClick = () => {
+    if (!validateForm()) return;
+
+    // Check if PIN is setup
+    if (isTransactionPinSetup()) {
+      setShowPinDialog(true);
+    } else {
+      // If no PIN setup, proceed directly
+      executePurchase();
+    }
+  };
+
+  const handlePinVerified = () => {
+    setShowPinDialog(false);
+    executePurchase();
+  };
+
+  const executePurchase = async () => {
     setPurchasing(true);
+    setPendingPurchase(false);
+    
+    const cleanPhone = phoneNumber.replace(/\D/g, '');
+    const amountValue = parseFloat(amount);
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -120,7 +149,7 @@ export default function Airtime() {
         body: {
           network: selectedNetwork,
           phone_number: cleanPhone,
-          amount: amountNum,
+          amount: amountValue,
         },
       });
 
@@ -280,7 +309,7 @@ export default function Airtime() {
           <Button
             className="w-full"
             size="lg"
-            onClick={handlePurchase}
+            onClick={handlePurchaseClick}
             disabled={!selectedNetwork || !phoneNumber || !amount || purchasing}
           >
             {purchasing ? (
@@ -294,6 +323,16 @@ export default function Airtime() {
           </Button>
         </div>
       </div>
+
+      {/* Transaction PIN Dialog */}
+      <TransactionPinDialog
+        open={showPinDialog}
+        onOpenChange={setShowPinDialog}
+        onComplete={handlePinVerified}
+        mode="verify"
+        title="Enter Transaction PIN"
+        description="Enter your 4-digit PIN to authorize this purchase"
+      />
     </MobileLayout>
   );
 }
