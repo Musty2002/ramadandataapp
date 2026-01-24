@@ -197,9 +197,29 @@ export default function Data() {
         },
       });
 
-      // Check for SDK-level errors
+      // Handle errors - the SDK puts non-2xx responses in error, with body in error.context
       if (error) {
-        throw new Error(error.message || 'Purchase failed');
+        // Try to extract the actual error message from the response
+        let errorMessage = 'Purchase failed';
+        try {
+          // error.context contains the response body for non-2xx responses
+          const context = (error as any).context;
+          if (context?.body) {
+            const bodyText = await new Response(context.body).text();
+            const parsed = JSON.parse(bodyText);
+            errorMessage = parsed.error || parsed.message || parsed.details || errorMessage;
+          } else if (error.message) {
+            // Try to extract JSON from error message
+            const jsonMatch = error.message.match(/\{[^}]+\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              errorMessage = parsed.error || parsed.message || errorMessage;
+            }
+          }
+        } catch {
+          errorMessage = error.message || 'Purchase failed';
+        }
+        throw new Error(errorMessage);
       }
 
       // Check for API-level errors (returned in data.error)
