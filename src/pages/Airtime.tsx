@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
+import { parseError, getApiErrorMessage } from '@/lib/errorHandler';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -153,27 +155,35 @@ export default function Airtime() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(error.message || 'Purchase failed');
+      }
 
       if (data?.success) {
         toast({
           title: 'Success',
-          description: data.message,
+          description: data.message || 'Airtime purchase successful!',
         });
-        // Reset form
         setPhoneNumber('');
         setAmount('');
         navigate('/history');
       } else {
-        throw new Error(data?.error || 'Purchase failed');
+        const errorInfo = getApiErrorMessage(data);
+        throw new Error(errorInfo.description);
       }
     } catch (error: unknown) {
       console.error('Purchase error:', error);
-      const message = error instanceof Error ? error.message : 'Failed to purchase airtime. Please try again.';
+      const errorInfo = parseError(error);
+      
       toast({
         variant: 'destructive',
-        title: 'Purchase Failed',
-        description: message,
+        title: errorInfo.title,
+        description: errorInfo.description,
+        action: errorInfo.isInsufficientBalance ? (
+          <ToastAction altText="Add Money" onClick={() => navigate('/add-money')}>
+            Add Money
+          </ToastAction>
+        ) : undefined,
       });
     } finally {
       setPurchasing(false);
