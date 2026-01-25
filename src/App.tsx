@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { PushNotificationProvider } from "@/components/PushNotificationProvider";
 
 
 // Pages
@@ -269,7 +270,9 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <AppRoutes />
+          <PushNotificationProvider>
+            <AppRoutes />
+          </PushNotificationProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
