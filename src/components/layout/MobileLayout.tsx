@@ -1,7 +1,8 @@
 import { ReactNode, useEffect } from 'react';
 import { BottomNav } from './BottomNav';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
+import { App } from '@capacitor/app';
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -9,51 +10,54 @@ interface MobileLayoutProps {
 }
 
 export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
-  // Fix keyboard behavior - ensure layout resets when keyboard hides
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
-    const setupKeyboardListeners = async () => {
-      try {
-        // Force layout recalculation when keyboard hides
-        await Keyboard.addListener('keyboardWillHide', () => {
-          // Reset any viewport modifications
-          document.body.style.height = '';
-          document.documentElement.style.height = '';
-          
-          // Force repaint to fix half-screen issue
-          window.scrollTo(0, 0);
-          
-          // Additional fix for USSD notification overlay issues
-          setTimeout(() => {
-            window.dispatchEvent(new Event('resize'));
-          }, 100);
-        });
-
-        await Keyboard.addListener('keyboardDidHide', () => {
-          // Double-check layout is restored after keyboard fully hides
-          document.body.style.height = '100%';
-          document.documentElement.style.height = '100%';
-          
-          setTimeout(() => {
-            document.body.style.height = '';
-            document.documentElement.style.height = '';
-          }, 50);
-        });
-      } catch (error) {
-        console.log('Keyboard plugin not available:', error);
-      }
+    const updateAppHeight = () => {
+      const height = window.visualViewport?.height ?? window.innerHeight;
+      document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
     };
 
-    setupKeyboardListeners();
+    // Some Android overlays (USSD dialogs) can leave the WebView with a stale viewport.
+    // Re-apply the height a few times to catch late layout updates.
+    const stabilizeAppHeight = () => {
+      updateAppHeight();
+      requestAnimationFrame(updateAppHeight);
+      [50, 150, 300, 600].forEach((ms) => setTimeout(updateAppHeight, ms));
+    };
+
+    stabilizeAppHeight();
+
+    const vv = window.visualViewport;
+    vv?.addEventListener('resize', stabilizeAppHeight);
+    vv?.addEventListener('scroll', stabilizeAppHeight);
+    window.addEventListener('resize', stabilizeAppHeight);
+    window.addEventListener('orientationchange', stabilizeAppHeight);
+
+    const handlePromises: Promise<PluginListenerHandle>[] = [];
+
+    if (Capacitor.isNativePlatform()) {
+      // Keyboard events (when they fire) + resume (covers USSD flow on some devices)
+      try {
+        handlePromises.push(Keyboard.addListener('keyboardWillShow', stabilizeAppHeight));
+        handlePromises.push(Keyboard.addListener('keyboardDidShow', stabilizeAppHeight));
+        handlePromises.push(Keyboard.addListener('keyboardWillHide', stabilizeAppHeight));
+        handlePromises.push(Keyboard.addListener('keyboardDidHide', stabilizeAppHeight));
+        handlePromises.push(App.addListener('resume', stabilizeAppHeight));
+      } catch {
+        // Ignore if a plugin isn't available in a given runtime (web preview, etc.)
+      }
+    }
 
     return () => {
-      Keyboard.removeAllListeners().catch(() => {});
+      vv?.removeEventListener('resize', stabilizeAppHeight);
+      vv?.removeEventListener('scroll', stabilizeAppHeight);
+      window.removeEventListener('resize', stabilizeAppHeight);
+      window.removeEventListener('orientationchange', stabilizeAppHeight);
+      handlePromises.forEach((p) => p.then((h) => h.remove()).catch(() => {}));
     };
   }, []);
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-background flex flex-col">
+    <div className="w-full max-w-md mx-auto bg-background flex flex-col min-h-[var(--app-height)]">
       <main className={`flex-1 ${showNav ? 'pb-20' : ''}`}>
         {children}
       </main>

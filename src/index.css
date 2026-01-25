@@ -6,6 +6,9 @@
 
 @layer base {
   :root {
+    /* Dynamic viewport height (fixed via JS in MobileLayout) */
+    --app-height: 100vh;
+
     /* Light blue gradient background inspired by logo */
     --background: 200 60% 97%;
     --foreground: 215 50% 15%;
@@ -119,6 +122,13 @@
   /* Mobile app styling */
   html {
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Ensure the app can correctly size itself to the viewport */
+  html,
+  body,
+  #root {
+    height: 100%;
   }
 }
 
