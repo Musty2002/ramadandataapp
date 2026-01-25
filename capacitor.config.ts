@@ -5,11 +5,11 @@ const config: CapacitorConfig = {
   appName: 'Ramadan Data',
   webDir: 'dist',
   server: {
-    // Use the preview URL for hot-reload during development
-    url: 'https://id-preview--f2d268fb-d29f-46e2-885d-9cb4b456af13.lovable.app?forceHideBadge=true',
+    // For production: comment out 'url' to load from local dist folder
+    // For development hot-reload: uncomment the url line below
+    // url: 'https://f2d268fb-d29f-46e2-885d-9cb4b456af13.lovableproject.com?forceHideBadge=true',
     cleartext: true,
-    // Prevent external URL navigation
-    allowNavigation: ['*.lovable.app', '*.supabase.co']
+    androidScheme: 'https'
   },
   plugins: {
     SplashScreen: {
