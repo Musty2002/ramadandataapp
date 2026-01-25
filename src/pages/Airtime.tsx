@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
-
+import { TransactionReceipt } from '@/components/TransactionReceipt';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -34,6 +34,15 @@ interface AirtimePlan {
   max_amount: number;
 }
 
+interface LastTransaction {
+  id: string;
+  date: Date;
+  phoneNumber: string;
+  network: string;
+  amount: number;
+  type: 'airtime';
+}
+
 export default function Airtime() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -44,6 +53,8 @@ export default function Airtime() {
   const [bestPlan, setBestPlan] = useState<AirtimePlan | null>(null);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [pendingPurchase, setPendingPurchase] = useState(false);
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [lastTransaction, setLastTransaction] = useState<LastTransaction | null>(null);
 
   // Fetch best airtime plan when network changes
   useEffect(() => {
@@ -186,13 +197,21 @@ export default function Airtime() {
       }
 
       if (data?.success) {
+        // Set last transaction for receipt
+        setLastTransaction({
+          id: data.transaction_id || crypto.randomUUID(),
+          date: new Date(),
+          phoneNumber: cleanPhone,
+          network: selectedNetwork!,
+          amount: amountValue,
+          type: 'airtime',
+        });
+        setShowReceipt(true);
+        
         toast({
           title: 'Success',
           description: data.message || 'Airtime purchase successful!',
         });
-        setPhoneNumber('');
-        setAmount('');
-        navigate('/history');
       } else {
         throw new Error(data?.details || 'Purchase failed');
       }
@@ -373,6 +392,20 @@ export default function Airtime() {
         title="Enter Transaction PIN"
         description="Enter your 4-digit PIN to authorize this purchase"
       />
+
+      {/* Transaction Receipt */}
+      {lastTransaction && (
+        <TransactionReceipt
+          open={showReceipt}
+          onClose={() => {
+            setShowReceipt(false);
+            setPhoneNumber('');
+            setAmount('');
+            navigate('/history');
+          }}
+          transaction={lastTransaction}
+        />
+      )}
     </MobileLayout>
   );
 }
