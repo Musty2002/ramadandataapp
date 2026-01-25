@@ -1,73 +1,89 @@
-# Welcome to your Lovable project
+# Ramadan Data App (RDA)
 
-## Project info
+A mobile-first digital services platform for purchasing airtime, data bundles, electricity tokens, TV subscriptions, and exam pins in Nigeria.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Features
 
-## How can I edit this code?
+- 💳 **Virtual Account** - Fund wallet via bank transfer
+- 📱 **Airtime & Data** - Purchase for MTN, Airtel, Glo, 9Mobile
+- ⚡ **Electricity** - Buy prepaid/postpaid tokens
+- 📺 **TV Subscriptions** - DSTV, GOtv, Startimes
+- 📝 **Exam Pins** - WAEC, NECO, NABTEB, JAMB
+- 👥 **Referral System** - Earn bonuses for referrals
+- 🔐 **Secure** - Transaction PIN & biometric authentication
+- 📲 **Push Notifications** - Real-time transaction alerts
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React, TypeScript, Vite, Tailwind CSS
+- **UI Components**: shadcn/ui
+- **Backend**: Supabase (Database, Auth, Edge Functions)
+- **Mobile**: Capacitor (Android/iOS)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ 
+- npm or bun
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
+```bash
+# Clone the repository
 git clone <YOUR_GIT_URL>
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to project directory
+cd ramadan-data-app
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Building for Android
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+# Build the web app
+npm run build
 
-**Use GitHub Codespaces**
+# Sync with Capacitor
+npx cap sync
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+# Open in Android Studio
+npx cap open android
+```
 
-## What technologies are used for this project?
+## Project Structure
 
-This project is built with:
+```
+src/
+├── components/     # Reusable UI components
+├── pages/          # Route pages
+├── hooks/          # Custom React hooks
+├── lib/            # Utility functions
+├── integrations/   # External service integrations
+└── assets/         # Images and static assets
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+supabase/
+└── functions/      # Edge functions for API calls
+```
 
-## How can I deploy this project?
+## Environment Variables
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+The app requires the following environment variables:
 
-## Can I connect a custom domain to my Lovable project?
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anon key
 
-Yes, you can!
+## Support
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- 📧 Email: ramadandataapp@gmail.com
+- 📞 Phone: 09068502050
+- 💬 WhatsApp: +2347032168097
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## License
+
+This project is proprietary software. All rights reserved.
