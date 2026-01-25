@@ -106,6 +106,11 @@ export default function AdminLogin() {
                       <Input 
                         type="email" 
                         placeholder="admin@example.com" 
+                        inputMode="email"
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        autoCorrect="off"
+                        spellCheck={false}
                         {...field} 
                       />
                     </FormControl>
@@ -124,6 +129,7 @@ export default function AdminLogin() {
                       <Input 
                         type="password" 
                         placeholder="••••••••" 
+                        autoComplete="current-password"
                         {...field} 
                       />
                     </FormControl>

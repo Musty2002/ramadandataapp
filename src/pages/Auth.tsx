@@ -40,8 +40,22 @@ export default function Auth() {
   const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: '' });
+    const { name, value } = e.target;
+
+    // Some Android WebViews emit a spurious empty "change" for the email field
+    // right when the user focuses the password input (autofill/focus quirk).
+    // Guard against wiping an already-entered email.
+    if (
+      name === 'email' &&
+      value === '' &&
+      formData.email &&
+      (document.activeElement?.getAttribute('name') === 'password' || (document.activeElement as any)?.id === 'password')
+    ) {
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -170,6 +184,7 @@ export default function Auth() {
                   id="fullName"
                   name="fullName"
                   placeholder="Enter your full name"
+                  autoComplete="name"
                   value={formData.fullName}
                   onChange={handleChange}
                   className={errors.fullName ? 'border-destructive' : ''}
@@ -186,6 +201,8 @@ export default function Auth() {
                   name="phone"
                   type="tel"
                   placeholder="08012345678"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={formData.phone}
                   onChange={handleChange}
                   className={errors.phone ? 'border-destructive' : ''}
@@ -204,6 +221,11 @@ export default function Auth() {
               name="email"
               type="email"
               placeholder="you@example.com"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               value={formData.email}
               onChange={handleChange}
               className={errors.email ? 'border-destructive' : ''}
@@ -221,6 +243,7 @@ export default function Auth() {
                 name="password"
                 type={showPassword ? 'text' : 'password'}
                 placeholder="Enter your password"
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
                 value={formData.password}
                 onChange={handleChange}
                 className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
@@ -245,6 +268,7 @@ export default function Auth() {
                 id="referralCode"
                 name="referralCode"
                 placeholder="Enter referral code"
+                autoComplete="off"
                 value={formData.referralCode}
                 onChange={handleChange}
               />

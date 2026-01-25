@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { BottomNav } from './BottomNav';
 import { Capacitor, type PluginListenerHandle } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
@@ -10,10 +10,46 @@ interface MobileLayoutProps {
 }
 
 export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
+  // Track the largest viewport height we've seen so we can recover from
+  // cases where Android (USSD overlays / keyboard) leaves the WebView “stuck” smaller.
+  const maxViewportHeightRef = useRef(0);
+  const keyboardVisibleRef = useRef(false);
+
   useEffect(() => {
+    const isTextInputFocused = () => {
+      const el = document.activeElement;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement).isContentEditable;
+    };
+
     const updateAppHeight = () => {
-      const height = window.visualViewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty('--app-height', `${Math.round(height)}px`);
+      const vvHeight = window.visualViewport?.height;
+      const innerHeight = window.innerHeight;
+      const screenHeight = window.screen?.height ?? 0;
+
+      // Some devices report either visualViewport OR innerHeight incorrectly.
+      // Take the larger as our best measurement of the current usable area.
+      const measured = Math.max(vvHeight ?? 0, innerHeight);
+
+      // Learn the "full" height over time.
+      const fullCandidate = Math.max(measured, screenHeight);
+      if (fullCandidate > maxViewportHeightRef.current) {
+        maxViewportHeightRef.current = fullCandidate;
+      }
+
+      // If a text field is focused, assume the keyboard may be open even if
+      // native keyboard events fail on certain devices.
+      const maybeKeyboardOpen =
+        Capacitor.isNativePlatform() && isTextInputFocused() && measured < maxViewportHeightRef.current;
+
+      const keyboardOpen = keyboardVisibleRef.current || maybeKeyboardOpen;
+
+      // When the keyboard is NOT open, force-restore to the largest height we've seen.
+      // This is the key fix for the "half screen" stuck state.
+      const target = keyboardOpen ? measured : Math.max(measured, maxViewportHeightRef.current);
+
+      document.documentElement.style.setProperty('--app-height', `${Math.round(target)}px`);
     };
 
     // Some Android overlays (USSD dialogs) can leave the WebView with a stale viewport.
@@ -37,11 +73,37 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
     if (Capacitor.isNativePlatform()) {
       // Keyboard events (when they fire) + resume (covers USSD flow on some devices)
       try {
-        handlePromises.push(Keyboard.addListener('keyboardWillShow', stabilizeAppHeight));
-        handlePromises.push(Keyboard.addListener('keyboardDidShow', stabilizeAppHeight));
-        handlePromises.push(Keyboard.addListener('keyboardWillHide', stabilizeAppHeight));
-        handlePromises.push(Keyboard.addListener('keyboardDidHide', stabilizeAppHeight));
-        handlePromises.push(App.addListener('resume', stabilizeAppHeight));
+        handlePromises.push(
+          Keyboard.addListener('keyboardWillShow', () => {
+            keyboardVisibleRef.current = true;
+            stabilizeAppHeight();
+          }),
+        );
+        handlePromises.push(
+          Keyboard.addListener('keyboardDidShow', () => {
+            keyboardVisibleRef.current = true;
+            stabilizeAppHeight();
+          }),
+        );
+        handlePromises.push(
+          Keyboard.addListener('keyboardWillHide', () => {
+            keyboardVisibleRef.current = false;
+            stabilizeAppHeight();
+          }),
+        );
+        handlePromises.push(
+          Keyboard.addListener('keyboardDidHide', () => {
+            keyboardVisibleRef.current = false;
+            stabilizeAppHeight();
+          }),
+        );
+        handlePromises.push(
+          App.addListener('resume', () => {
+            // After USSD overlays, treat as keyboard closed and re-stabilize.
+            keyboardVisibleRef.current = false;
+            stabilizeAppHeight();
+          }),
+        );
       } catch {
         // Ignore if a plugin isn't available in a given runtime (web preview, etc.)
       }
