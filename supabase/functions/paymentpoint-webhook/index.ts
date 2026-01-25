@@ -204,6 +204,60 @@ Deno.serve(async (req) => {
       type: 'success',
     })
 
+    // Send push notification for credit alert
+    const pushTitle = '💰 Credit Alert!'
+    const pushBody = `₦${Number(amount).toLocaleString()} has been credited to your wallet.${feeMessage ? ` ${feeMessage}` : ''} New balance: ₦${newBalance.toLocaleString()}`
+    
+    // Fetch user's push tokens
+    const { data: pushTokens } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint')
+      .eq('user_id', profile.user_id)
+    
+    if (pushTokens && pushTokens.length > 0) {
+      console.log(`Sending push notifications to ${pushTokens.length} device(s)`)
+      
+      // Send push to all user's devices
+      for (const tokenRecord of pushTokens) {
+        try {
+          const pushResponse = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              token: tokenRecord.endpoint,
+              title: pushTitle,
+              body: pushBody,
+              data: {
+                type: 'credit',
+                amount: String(amount),
+                new_balance: String(newBalance),
+                transaction_reference: transactionReference,
+              },
+            }),
+          })
+          
+          const pushResult = await pushResponse.json()
+          console.log('Push notification result:', pushResult)
+          
+          // Clean up unregistered tokens
+          if (pushResult.errorCode === 'UNREGISTERED') {
+            console.log('Removing unregistered token:', tokenRecord.endpoint)
+            await supabase
+              .from('push_subscriptions')
+              .delete()
+              .eq('endpoint', tokenRecord.endpoint)
+          }
+        } catch (pushError) {
+          console.error('Push notification error:', pushError)
+        }
+      }
+    } else {
+      console.log('No push tokens found for user:', profile.user_id)
+    }
+
     console.log('Payment processed successfully:', {
       user_id: profile.user_id,
       amount,
