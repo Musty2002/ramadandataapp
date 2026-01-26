@@ -474,9 +474,11 @@ export default function Data() {
                 <Input
                   id="phone"
                   type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   placeholder="08012345678"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
                   className="mt-2 h-12 text-lg"
                   maxLength={11}
                 />

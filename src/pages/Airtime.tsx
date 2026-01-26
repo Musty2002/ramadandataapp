@@ -325,10 +325,12 @@ export default function Airtime() {
             <Input
               id="phone"
               type="tel"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="08012345678"
               value={phoneNumber}
               onChange={(e) => {
-                const value = e.target.value;
+                const value = e.target.value.replace(/\D/g, '');
                 setPhoneNumber(value);
                 
                 // Auto-detect network from phone number
