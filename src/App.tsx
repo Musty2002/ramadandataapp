@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PushNotificationProvider } from "@/components/PushNotificationProvider";
+import { NetworkStatusIndicator } from "@/components/NetworkStatus";
 
 
 // Pages
@@ -271,6 +272,7 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <PushNotificationProvider>
+            <NetworkStatusIndicator />
             <AppRoutes />
           </PushNotificationProvider>
         </AuthProvider>
