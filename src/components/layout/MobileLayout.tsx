@@ -23,6 +23,14 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       return tag === 'INPUT' || tag === 'TEXTAREA' || (el as HTMLElement).isContentEditable;
     };
 
+    const blurActiveInput = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return;
+      const tag = el.tagName;
+      const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+      if (isInput) el.blur();
+    };
+
     const updateAppHeight = () => {
       const vvHeight = window.visualViewport?.height;
       const innerHeight = window.innerHeight;
@@ -37,6 +45,14 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       const fullCandidate = Math.max(measured, screenHeight, availHeight);
       if (fullCandidate > maxViewportHeightRef.current) {
         maxViewportHeightRef.current = fullCandidate;
+      }
+
+      // When a system overlay (USSD dialog, permission sheet, etc.) is on top,
+      // the WebView may keep an input focused even though the keyboard belongs to the OS.
+      // Treat focus loss as an overlay signal: clear keyboard state and blur inputs.
+      if (Capacitor.isNativePlatform() && !document.hasFocus()) {
+        keyboardVisibleRef.current = false;
+        blurActiveInput();
       }
 
       const webInputFocused = isTextInputFocused();
@@ -91,6 +107,15 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       keyboardVisibleRef.current = false;
       stabilizeAppHeight();
     };
+
+    // System overlays often trigger window blur without a matching keyboard hide.
+    // Blur the web input so we don't misclassify the OS keyboard as our own.
+    const onBlur = () => {
+      keyboardVisibleRef.current = false;
+      blurActiveInput();
+      stabilizeAppHeight();
+    };
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         keyboardVisibleRef.current = false;
@@ -98,6 +123,7 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       }
     };
     window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     const handlePromises: Promise<PluginListenerHandle>[] = [];
@@ -143,6 +169,14 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
             setTimeout(stabilizeAppHeight, 600);
           }),
         );
+
+        // Some devices fire pause when USSD is shown; use it to clear focus early.
+        handlePromises.push(
+          App.addListener('pause', () => {
+            keyboardVisibleRef.current = false;
+            blurActiveInput();
+          }),
+        );
       } catch {
         // Ignore if a plugin isn't available in a given runtime (web preview, etc.)
       }
@@ -154,6 +188,7 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       window.removeEventListener('resize', stabilizeAppHeight);
       window.removeEventListener('orientationchange', stabilizeAppHeight);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       handlePromises.forEach((p) => p.then((h) => h.remove()).catch(() => {}));
     };
