@@ -25,6 +25,29 @@ const networks = [
 
 const quickAmounts = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
 
+// Nigerian phone number prefixes mapped to networks
+const networkPrefixes: Record<string, string[]> = {
+  mtn: ['0703', '0706', '0803', '0806', '0810', '0813', '0814', '0816', '0903', '0906', '0913', '0916'],
+  airtel: ['0701', '0708', '0802', '0808', '0812', '0901', '0902', '0904', '0907', '0912'],
+  glo: ['0705', '0805', '0807', '0811', '0815', '0905', '0915'],
+  '9mobile': ['0809', '0817', '0818', '0908', '0909'],
+};
+
+// Function to detect network from phone number
+const detectNetwork = (phone: string): string | null => {
+  const cleanPhone = phone.replace(/\D/g, '');
+  if (cleanPhone.length < 4) return null;
+  
+  const prefix = cleanPhone.substring(0, 4);
+  
+  for (const [network, prefixes] of Object.entries(networkPrefixes)) {
+    if (prefixes.includes(prefix)) {
+      return network;
+    }
+  }
+  return null;
+};
+
 interface AirtimePlan {
   id: string;
   provider: string;
@@ -304,10 +327,24 @@ export default function Airtime() {
               type="tel"
               placeholder="08012345678"
               value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setPhoneNumber(value);
+                
+                // Auto-detect network from phone number
+                const detected = detectNetwork(value);
+                if (detected && detected !== selectedNetwork) {
+                  setSelectedNetwork(detected);
+                }
+              }}
               className="mt-2"
               maxLength={11}
             />
+            {selectedNetwork && phoneNumber.length >= 4 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Network detected: <span className="font-medium text-primary">{networks.find(n => n.id === selectedNetwork)?.name}</span>
+              </p>
+            )}
           </div>
 
           {/* Amount */}
