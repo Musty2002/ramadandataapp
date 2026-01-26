@@ -110,7 +110,7 @@ export function AccountCard() {
     }
   };
 
-  // Subscribe to realtime wallet updates
+  // Subscribe to realtime wallet updates with error handling
   useEffect(() => {
     if (!user?.id) return;
 
@@ -131,14 +131,20 @@ export function AccountCard() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[AccountCard] Wallet realtime subscription active');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[AccountCard] Wallet subscription error:', err);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
-  // Subscribe to profile updates (for virtual account creation)
+  // Subscribe to profile updates (for virtual account creation) with error handling
   useEffect(() => {
     if (!user?.id) return;
 
@@ -156,7 +162,13 @@ export function AccountCard() {
           refreshProfile?.();
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[AccountCard] Profile realtime subscription active');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error('[AccountCard] Profile subscription error:', err);
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
