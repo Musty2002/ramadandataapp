@@ -7,7 +7,7 @@ export default function Referral() {
 
   return (
     <MobileLayout showNav={false}>
-      <div className="safe-area-top min-h-screen flex flex-col">
+      <div className="safe-area-top flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-4 px-4 py-4">
           <button onClick={() => navigate(-1)} className="p-2 -ml-2">
