@@ -39,12 +39,21 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
         maxViewportHeightRef.current = fullCandidate;
       }
 
+      const webInputFocused = isTextInputFocused();
+
+      // USSD dialogs can trigger native "keyboard shown" events even though
+      // the keyboard belongs to the system dialog, not our WebView.
+      // If we don't have a focused input in the WebView, treat keyboard as closed.
+      if (keyboardVisibleRef.current && !webInputFocused) {
+        keyboardVisibleRef.current = false;
+      }
+
       // If a text field is focused, assume the keyboard may be open even if
       // native keyboard events fail on certain devices.
       const maybeKeyboardOpen =
-        Capacitor.isNativePlatform() && isTextInputFocused() && measured < maxViewportHeightRef.current * 0.75;
+        Capacitor.isNativePlatform() && webInputFocused && measured < maxViewportHeightRef.current * 0.75;
 
-      const keyboardOpen = keyboardVisibleRef.current || maybeKeyboardOpen;
+      const keyboardOpen = (keyboardVisibleRef.current && webInputFocused) || maybeKeyboardOpen;
 
       // When the keyboard is NOT open, AGGRESSIVELY force-restore to the largest height we've seen.
       // This is the key fix for the "half screen" stuck state.
@@ -75,6 +84,21 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
     vv?.addEventListener('scroll', stabilizeAppHeight);
     window.addEventListener('resize', stabilizeAppHeight);
     window.addEventListener('orientationchange', stabilizeAppHeight);
+
+    // Some system overlays won't trigger Keyboard "hide" events for the WebView.
+    // When we regain focus/visibility, aggressively re-stabilize and assume keyboard is closed.
+    const onFocus = () => {
+      keyboardVisibleRef.current = false;
+      stabilizeAppHeight();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        keyboardVisibleRef.current = false;
+        stabilizeAppHeight();
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const handlePromises: Promise<PluginListenerHandle>[] = [];
 
@@ -129,6 +153,8 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       vv?.removeEventListener('scroll', stabilizeAppHeight);
       window.removeEventListener('resize', stabilizeAppHeight);
       window.removeEventListener('orientationchange', stabilizeAppHeight);
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       handlePromises.forEach((p) => p.then((h) => h.remove()).catch(() => {}));
     };
   }, []);
