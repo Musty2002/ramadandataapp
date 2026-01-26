@@ -32,8 +32,9 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       // Take the larger as our best measurement of the current usable area.
       const measured = Math.max(vvHeight ?? 0, innerHeight);
 
-      // Learn the "full" height over time.
-      const fullCandidate = Math.max(measured, screenHeight);
+      // Learn the "full" height over time, including screen.availHeight
+      const availHeight = window.screen?.availHeight ?? 0;
+      const fullCandidate = Math.max(measured, screenHeight, availHeight);
       if (fullCandidate > maxViewportHeightRef.current) {
         maxViewportHeightRef.current = fullCandidate;
       }
@@ -41,23 +42,30 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
       // If a text field is focused, assume the keyboard may be open even if
       // native keyboard events fail on certain devices.
       const maybeKeyboardOpen =
-        Capacitor.isNativePlatform() && isTextInputFocused() && measured < maxViewportHeightRef.current;
+        Capacitor.isNativePlatform() && isTextInputFocused() && measured < maxViewportHeightRef.current * 0.75;
 
       const keyboardOpen = keyboardVisibleRef.current || maybeKeyboardOpen;
 
-      // When the keyboard is NOT open, force-restore to the largest height we've seen.
+      // When the keyboard is NOT open, AGGRESSIVELY force-restore to the largest height we've seen.
       // This is the key fix for the "half screen" stuck state.
-      const target = keyboardOpen ? measured : Math.max(measured, maxViewportHeightRef.current);
+      const target = keyboardOpen ? measured : maxViewportHeightRef.current;
 
       document.documentElement.style.setProperty('--app-height', `${Math.round(target)}px`);
+      
+      // Also force a style recalculation to ensure the browser applies it
+      if (!keyboardOpen && measured < maxViewportHeightRef.current * 0.9) {
+        document.documentElement.style.height = `${Math.round(target)}px`;
+        document.body.style.height = `${Math.round(target)}px`;
+      }
     };
 
     // Some Android overlays (USSD dialogs) can leave the WebView with a stale viewport.
-    // Re-apply the height a few times to catch late layout updates.
+    // Re-apply the height multiple times with more aggressive timing to catch late layout updates.
     const stabilizeAppHeight = () => {
       updateAppHeight();
       requestAnimationFrame(updateAppHeight);
-      [50, 150, 300, 600].forEach((ms) => setTimeout(updateAppHeight, ms));
+      requestAnimationFrame(() => requestAnimationFrame(updateAppHeight));
+      [50, 150, 300, 600, 1000].forEach((ms) => setTimeout(updateAppHeight, ms));
     };
 
     stabilizeAppHeight();
@@ -88,20 +96,27 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
         handlePromises.push(
           Keyboard.addListener('keyboardWillHide', () => {
             keyboardVisibleRef.current = false;
-            stabilizeAppHeight();
+            // Immediately try to restore
+            setTimeout(stabilizeAppHeight, 0);
           }),
         );
         handlePromises.push(
           Keyboard.addListener('keyboardDidHide', () => {
             keyboardVisibleRef.current = false;
+            // Multiple stabilization attempts with delays
             stabilizeAppHeight();
+            setTimeout(stabilizeAppHeight, 100);
+            setTimeout(stabilizeAppHeight, 300);
           }),
         );
         handlePromises.push(
           App.addListener('resume', () => {
-            // After USSD overlays, treat as keyboard closed and re-stabilize.
+            // After USSD overlays, treat as keyboard closed and aggressively re-stabilize.
             keyboardVisibleRef.current = false;
-            stabilizeAppHeight();
+            setTimeout(stabilizeAppHeight, 0);
+            setTimeout(stabilizeAppHeight, 100);
+            setTimeout(stabilizeAppHeight, 300);
+            setTimeout(stabilizeAppHeight, 600);
           }),
         );
       } catch {
