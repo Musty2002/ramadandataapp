@@ -138,7 +138,11 @@ export default function AdminSettings() {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="font-medium">RGC</span>
-                  <span className="text-sm text-muted-foreground">Airtime</span>
+                  <span className="text-sm text-muted-foreground">Airtime, Data</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="font-medium">Albarka</span>
+                  <span className="text-sm text-muted-foreground">Airtime, Data</span>
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="font-medium">PaymentPoint</span>
