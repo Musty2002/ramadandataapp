@@ -499,7 +499,7 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid network for Albarka' }
     }
 
-    const response = await fetch('https://app.albarkasub.com/api/data/', {
+    const response = await fetch('https://albarkasub.com/api/data/', {
       method: 'POST',
       headers: {
         'Authorization': `Token ${apiToken}`,
