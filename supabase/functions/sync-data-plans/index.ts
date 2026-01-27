@@ -323,11 +323,57 @@ async function fetchAlbarkaCategories(): Promise<{ id: string; name: string; ser
   ]
 }
 
-async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
+// Helper to get Albarka access token using Basic Auth
+async function getAlbarkaAccessToken(): Promise<string | null> {
   const apiToken = Deno.env.get('ALBARKA_API_TOKEN')
 
   if (!apiToken) {
-    throw new Error('Albarka API token not configured')
+    console.error('Albarka API token not configured')
+    return null
+  }
+  
+  // The ALBARKA_API_TOKEN should be stored as "username:password"
+  // We need to encode it as base64 for Basic Auth
+  const credentials = btoa(apiToken)
+  
+  try {
+    console.log('Getting Albarka access token...')
+    
+    const response = await fetch('https://albarkasub.com/api/user', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error(`Failed to get Albarka token: ${response.status}`)
+      const errorText = await response.text()
+      console.error('Albarka auth error:', errorText)
+      return null
+    }
+
+    const data = await response.json()
+    console.log('Albarka auth response:', JSON.stringify(data).slice(0, 200))
+    
+    if (data.status === 'success' && data.AccessToken) {
+      return data.AccessToken
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error getting Albarka token:', error)
+    return null
+  }
+}
+
+async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
+  const accessToken = await getAlbarkaAccessToken()
+
+  if (!accessToken) {
+    console.error('Could not get Albarka access token')
+    return []
   }
 
   const networkId = ALBARKA_NETWORK_IDS[currentNetwork]
@@ -339,10 +385,11 @@ async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
   try {
     console.log(`Fetching Albarka plans for network ${currentNetwork} (ID: ${networkId})...`)
     
-    const response = await fetch(`https://app.albarkasub.com/api/data/`, {
+    // Fetch data plans using the access token
+    const response = await fetch(`https://albarkasub.com/api/data/?network=${networkId}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Token ${apiToken}`,
+        'Authorization': `Token ${accessToken}`,
         'Content-Type': 'application/json'
       }
     })
@@ -357,34 +404,38 @@ async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
     const data = await response.json()
     console.log(`Albarka plans response:`, JSON.stringify(data).slice(0, 1000))
 
-    // Filter plans by network ID and category
-    const allPlans = Array.isArray(data) ? data : (data.data || data.plans || [])
+    // Parse plans from response
+    const allPlans = Array.isArray(data) ? data : (data.data || data.plans || data.DATAPLANS || [])
     
+    // Filter by category if needed
     const filteredPlans = allPlans.filter((plan: any) => {
-      const planNetwork = plan.network || plan.network_id
-      const planCategory = (plan.plan_type || plan.category || '').toLowerCase()
-      
-      // Check network match
-      if (String(planNetwork) !== String(networkId)) return false
+      const planType = (plan.plan_type || plan.category || plan.type || '').toLowerCase()
       
       // Check category match
-      if (categoryId === 'sme' && planCategory.includes('sme')) return true
-      if (categoryId === 'corporate' && (planCategory.includes('cg') || planCategory.includes('corporate'))) return true
-      if (categoryId === 'gifting' && (planCategory.includes('gift') || (!planCategory.includes('sme') && !planCategory.includes('cg') && !planCategory.includes('corporate')))) return true
+      if (categoryId === 'sme') {
+        return planType.includes('sme')
+      }
+      if (categoryId === 'corporate') {
+        return planType.includes('cg') || planType.includes('corporate')
+      }
+      if (categoryId === 'gifting') {
+        // Gifting = plans that are not SME or CG
+        return !planType.includes('sme') && !planType.includes('cg') && !planType.includes('corporate')
+      }
       
-      return categoryId === 'gifting' // Default to gifting if no category match
+      return true // Return all if category not matched
     })
 
     console.log(`Filtered ${filteredPlans.length} Albarka plans for ${currentNetwork}/${categoryId}`)
 
     return filteredPlans.map((plan: any) => {
-      const planName = plan.plan_name || plan.name || plan.plan || ''
+      const planName = plan.plan_name || plan.plan || plan.name || plan.data_plan || ''
       const dataAmount = extractDataAmount(planName)
       const validity = extractValidity(planName)
-      const price = parseFloat(plan.plan_amount || plan.amount || plan.price || 0)
-      const planId = plan.plan_id || plan.id
+      const price = parseFloat(plan.plan_amount || plan.amount || plan.price || plan.data_amount || 0)
+      const planId = plan.plan_id || plan.dataplan_id || plan.id
       
-      console.log(`Mapping Albarka plan: id=${planId}, name=${planName}`)
+      console.log(`Mapping Albarka plan: id=${planId}, name=${planName}, price=${price}`)
       
       return {
         provider: 'albarka',
