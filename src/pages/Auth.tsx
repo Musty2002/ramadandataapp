@@ -11,6 +11,14 @@ import { useKeyboardSafeInput } from '@/hooks/useKeyboardSafeInput';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/ramadan-logo.jpeg';
+import { 
+  PinLoginScreen, 
+  isPinLoginAvailable, 
+  getStoredUserForPinLogin,
+  storeUserForPinLogin,
+  clearStoredUserForPinLogin,
+} from '@/components/auth/PinLoginScreen';
+import { isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 
 const signUpSchema = z.object({
   fullName: z.string().min(2, 'Full name must be at least 2 characters'),
@@ -33,6 +41,8 @@ export default function Auth() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [showPinLogin, setShowPinLogin] = useState(false);
+  const [storedUser, setStoredUser] = useState(getStoredUserForPinLogin());
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -42,7 +52,7 @@ export default function Auth() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, profile } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { registerFocus, shouldIgnoreEmailBlank } = useKeyboardSafeInput();
@@ -56,7 +66,16 @@ export default function Auth() {
   } = useBiometricAuth();
 
   const storedCreds = hasStoredCredentials();
-  const showBiometricLogin = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials;
+
+  // Check if we should show PIN login on mount
+  useEffect(() => {
+    const user = getStoredUserForPinLogin();
+    const pinAvailable = isPinLoginAvailable();
+    setStoredUser(user);
+    if (user && pinAvailable) {
+      setShowPinLogin(true);
+    }
+  }, []);
 
   // Refs to protect email from being wiped on problematic Android devices (e.g., Camon 20)
   const emailInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +86,6 @@ export default function Auth() {
     const { name, value } = e.target;
 
     // Guard against wiping an already-entered email on some Android devices
-    // This happens when focusing password field triggers a spurious empty change on email
     if (name === 'email') {
       if (value === '' && formData.email) {
         const emailHasFocus = document.activeElement === emailInputRef.current;
@@ -76,18 +94,15 @@ export default function Auth() {
           document.activeElement?.getAttribute('name') === 'password' ||
           (document.activeElement as HTMLElement)?.id === 'password';
         
-        // Only allow clearing if email input itself has focus (user intentionally cleared it)
         if (!emailHasFocus && (passwordHasFocus || passwordRecentlyFocused || shouldIgnoreEmailBlank(value, formData.email))) {
           return;
         }
       }
-      // Store valid email for potential recovery
       if (value) {
         lastValidEmailRef.current = value;
       }
     }
 
-    // Track when password is focused to extend protection window
     if (name === 'password' && value && !formData.password) {
       passwordFocusTimeRef.current = Date.now();
     }
@@ -96,7 +111,6 @@ export default function Auth() {
     setErrors((prev) => ({ ...prev, [name]: '' }));
   };
 
-  // Custom focus handler for password that extends protection
   const handlePasswordFocus = (e: React.FocusEvent<HTMLInputElement>) => {
     passwordFocusTimeRef.current = Date.now();
     registerFocus('password')(e);
@@ -209,13 +223,15 @@ export default function Auth() {
               : error.message,
           });
         } else {
-          // Offer to enable biometric if available and not already enabled
-          if (biometricAvailable && !biometricEnabled) {
+          // Store credentials for biometric and PIN login
+          if (biometricAvailable) {
             await setCredentials(formData.email, formData.password);
-            toast({
-              title: 'Biometric Enabled',
-              description: `You can now use ${getBiometricLabel()} to sign in faster.`,
-            });
+            if (!biometricEnabled) {
+              toast({
+                title: 'Biometric Enabled',
+                description: `You can now use ${getBiometricLabel()} to sign in faster.`,
+              });
+            }
           }
           navigate('/dashboard');
         }
@@ -256,6 +272,10 @@ export default function Auth() {
             });
           }
         } else {
+          // Store credentials for future PIN login
+          if (biometricAvailable) {
+            await setCredentials(formData.email, formData.password);
+          }
           toast({
             title: 'Welcome!',
             description: 'Your account has been created successfully.',
@@ -273,6 +293,20 @@ export default function Auth() {
       setLoading(false);
     }
   };
+
+  const handleSwitchToPassword = () => {
+    setShowPinLogin(false);
+  };
+
+  // Show PIN login screen for returning users
+  if (showPinLogin && storedUser && isTransactionPinSetup()) {
+    return (
+      <PinLoginScreen 
+        storedUser={storedUser} 
+        onSwitchToPassword={handleSwitchToPassword}
+      />
+    );
+  }
 
   // Forgot password modal/view
   if (showForgotPassword) {
@@ -344,6 +378,9 @@ export default function Auth() {
     );
   }
 
+  // Show traditional biometric login button only when PIN login is not available
+  const showBiometricLoginButton = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials && !showPinLogin;
+
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
       {/* Logo */}
@@ -353,8 +390,8 @@ export default function Auth() {
         <p className="text-muted-foreground text-sm mt-1">Your trusted payment partner</p>
       </div>
 
-      {/* Biometric Quick Login */}
-      {showBiometricLogin && (
+      {/* Biometric Quick Login (only when PIN not available) */}
+      {showBiometricLoginButton && (
         <div className="w-full max-w-sm mb-4">
           <Button
             variant="outline"
