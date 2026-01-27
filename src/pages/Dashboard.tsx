@@ -10,11 +10,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 import { WhatsAppButton } from '@/components/dashboard/WhatsAppButton';
+import { storeUserForPinLogin } from '@/components/auth/PinLoginScreen';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { refreshWallet, refreshProfile } = useAuth();
+  const { refreshWallet, refreshProfile, profile, user } = useAuth();
   const { toast } = useToast();
   const [refreshTick, setRefreshTick] = useState(0);
   
@@ -32,10 +33,21 @@ export default function Dashboard() {
     checkPinSetup();
   }, []);
 
+  // Store user info for PIN login when profile is available
+  useEffect(() => {
+    if (profile && user?.email) {
+      storeUserForPinLogin(
+        user.email,
+        profile.full_name,
+        profile.avatar_url || undefined
+      );
+    }
+  }, [profile, user]);
+
   const handleTransactionPinComplete = () => {
     toast({
       title: 'Transaction PIN Set',
-      description: 'Your 4-digit transaction PIN has been created.',
+      description: 'Your 4-digit PIN has been created for login and transactions.',
     });
     setShowTransactionPinSetup(false);
   };
@@ -80,14 +92,14 @@ export default function Dashboard() {
       {/* WhatsApp Button */}
       <WhatsAppButton />
 
-      {/* Transaction PIN Setup Dialog (4-digit) */}
+      {/* Transaction PIN Setup Dialog (4-digit) - Used for both login and transactions */}
       <TransactionPinDialog
         open={showTransactionPinSetup}
         onOpenChange={setShowTransactionPinSetup}
         onComplete={handleTransactionPinComplete}
         mode="setup"
-        title="Set Transaction PIN"
-        description="Create a 4-digit PIN to authorize your transactions"
+        title="Set Your PIN"
+        description="Create a 4-digit PIN for quick login and transaction authorization"
       />
     </MobileLayout>
   );

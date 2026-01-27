@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Lock, Shield, Fingerprint } from 'lucide-react';
+import { ArrowLeft, Lock, Shield, Fingerprint, LogIn } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,7 @@ import {
   isBiometricForTransactionsEnabled,
   setBiometricForTransactions,
 } from '@/components/auth/TransactionPinDialog';
+import { clearStoredUserForPinLogin, isPinLoginAvailable } from '@/components/auth/PinLoginScreen';
 
 export default function Security() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export default function Security() {
   const [showTransactionPinDialog, setShowTransactionPinDialog] = useState(false);
   const [transactionPinMode, setTransactionPinMode] = useState<'setup' | 'change'>('setup');
   const [biometricForTransactions, setBiometricForTransactionsState] = useState(isBiometricForTransactionsEnabled());
+  const [pinLoginEnabled, setPinLoginEnabled] = useState(isPinLoginAvailable());
 
   const { 
     isAvailable: biometricAvailable, 
@@ -34,15 +36,18 @@ export default function Security() {
   useEffect(() => {
     setTransactionPinSetup(isTransactionPinSetup());
     setBiometricForTransactionsState(isBiometricForTransactionsEnabled());
+    setPinLoginEnabled(isPinLoginAvailable());
   }, []);
 
   const handleTransactionPinToggle = () => {
     if (transactionPinSetup) {
       clearTransactionPin();
+      clearStoredUserForPinLogin();
       setTransactionPinSetup(false);
+      setPinLoginEnabled(false);
       toast({
-        title: 'Transaction PIN Disabled',
-        description: 'Your transaction PIN has been removed.',
+        title: 'PIN Disabled',
+        description: 'Your PIN for login and transactions has been removed.',
       });
     } else {
       setTransactionPinMode('setup');
@@ -109,7 +114,7 @@ export default function Security() {
 
         {/* Security Options */}
         <div className="space-y-4">
-          {/* Transaction PIN */}
+          {/* PIN Login & Transactions */}
           <div className="bg-card rounded-xl p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
@@ -117,8 +122,8 @@ export default function Security() {
                   <Lock className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-medium">Transaction PIN</p>
-                  <p className="text-sm text-muted-foreground">4-digit PIN for transactions</p>
+                  <p className="font-medium">4-Digit PIN</p>
+                  <p className="text-sm text-muted-foreground">For quick login & transactions</p>
                 </div>
               </div>
               <Switch 
@@ -127,12 +132,19 @@ export default function Security() {
               />
             </div>
             {transactionPinSetup && (
-              <button
-                onClick={handleChangeTransactionPin}
-                className="mt-3 text-sm text-primary font-medium"
-              >
-                Change Transaction PIN
-              </button>
+              <div className="mt-3 flex items-center gap-4">
+                <button
+                  onClick={handleChangeTransactionPin}
+                  className="text-sm text-primary font-medium"
+                >
+                  Change PIN
+                </button>
+                {pinLoginEnabled && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <LogIn className="w-3 h-3" /> Quick login enabled
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -144,10 +156,10 @@ export default function Security() {
                   <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                     <Fingerprint className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="font-medium">{getBiometricLabel()} for Payments</p>
-                    <p className="text-sm text-muted-foreground">Use instead of PIN for transactions</p>
-                  </div>
+                <div>
+                  <p className="font-medium">{getBiometricLabel()} for Payments</p>
+                  <p className="text-sm text-muted-foreground">Use instead of PIN for transactions</p>
+                </div>
                 </div>
                 <Switch 
                   checked={biometricForTransactions} 
@@ -204,9 +216,10 @@ export default function Security() {
         onOpenChange={setShowTransactionPinDialog}
         onComplete={() => {
           setTransactionPinSetup(true);
+          setPinLoginEnabled(isPinLoginAvailable());
           toast({
-            title: 'Transaction PIN Set',
-            description: 'Your 4-digit transaction PIN has been created.',
+            title: 'PIN Set',
+            description: 'Your 4-digit PIN for login and transactions has been created.',
           });
         }}
         mode={transactionPinMode}
