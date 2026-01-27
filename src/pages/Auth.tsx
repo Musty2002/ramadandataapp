@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Fingerprint, Loader2 } from 'lucide-react';
 import { z } from 'zod';
@@ -58,25 +58,48 @@ export default function Auth() {
   const storedCreds = hasStoredCredentials();
   const showBiometricLogin = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials;
 
+  // Refs to protect email from being wiped on problematic Android devices (e.g., Camon 20)
+  const emailInputRef = useRef<HTMLInputElement>(null);
+  const lastValidEmailRef = useRef<string>('');
+  const passwordFocusTimeRef = useRef<number>(0);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
     // Guard against wiping an already-entered email on some Android devices
-    if (
-      name === 'email' &&
-      value === '' &&
-      formData.email &&
-      (
-        document.activeElement?.getAttribute('name') === 'password' ||
-        (document.activeElement as any)?.id === 'password' ||
-        shouldIgnoreEmailBlank(value, formData.email)
-      )
-    ) {
-      return;
+    // This happens when focusing password field triggers a spurious empty change on email
+    if (name === 'email') {
+      if (value === '' && formData.email) {
+        const emailHasFocus = document.activeElement === emailInputRef.current;
+        const passwordRecentlyFocused = Date.now() - passwordFocusTimeRef.current < 2000;
+        const passwordHasFocus = 
+          document.activeElement?.getAttribute('name') === 'password' ||
+          (document.activeElement as HTMLElement)?.id === 'password';
+        
+        // Only allow clearing if email input itself has focus (user intentionally cleared it)
+        if (!emailHasFocus && (passwordHasFocus || passwordRecentlyFocused || shouldIgnoreEmailBlank(value, formData.email))) {
+          return;
+        }
+      }
+      // Store valid email for potential recovery
+      if (value) {
+        lastValidEmailRef.current = value;
+      }
+    }
+
+    // Track when password is focused to extend protection window
+    if (name === 'password' && value && !formData.password) {
+      passwordFocusTimeRef.current = Date.now();
     }
 
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  // Custom focus handler for password that extends protection
+  const handlePasswordFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    passwordFocusTimeRef.current = Date.now();
+    registerFocus('password')(e);
   };
 
   const handleBiometricLogin = async () => {
@@ -427,6 +450,7 @@ export default function Auth() {
           <div>
             <Label htmlFor="email">Email</Label>
             <Input
+              ref={emailInputRef}
               id="email"
               name="email"
               type="email"
@@ -457,7 +481,7 @@ export default function Auth() {
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
                 value={formData.password}
                 onChange={handleChange}
-                onFocus={registerFocus('password')}
+                onFocus={handlePasswordFocus}
                 className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
               />
               <button
