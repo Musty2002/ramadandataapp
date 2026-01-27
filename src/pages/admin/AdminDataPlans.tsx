@@ -74,6 +74,20 @@ const PROVIDERS = [
   { id: 'albarka', name: 'Albarka' },
 ];
 
+function getInvokeErrorMessage(error: any): string {
+  // Supabase function invocation errors often hide the real message in `error.context.body`.
+  const rawBody = error?.context?.body;
+  if (typeof rawBody === 'string') {
+    try {
+      const parsed = JSON.parse(rawBody);
+      return parsed?.details || parsed?.error || error?.message || 'Request failed';
+    } catch {
+      // ignore
+    }
+  }
+  return error?.message || 'Request failed';
+}
+
 export default function AdminDataPlans() {
   const [activeTab, setActiveTab] = useState('database');
   
@@ -234,7 +248,7 @@ export default function AdminDataPlans() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to fetch categories',
+        description: getInvokeErrorMessage(error) || 'Failed to fetch categories',
       });
     } finally {
       setLoadingCategories(false);
@@ -271,7 +285,7 @@ export default function AdminDataPlans() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to fetch plans',
+        description: getInvokeErrorMessage(error) || 'Failed to fetch plans',
       });
     } finally {
       setLoadingApiPlans(false);
@@ -312,7 +326,7 @@ export default function AdminDataPlans() {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to add plan',
+        description: getInvokeErrorMessage(error) || 'Failed to add plan',
       });
     } finally {
       setAddingPlan(null);

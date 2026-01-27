@@ -314,13 +314,36 @@ const ALBARKA_NETWORK_IDS: Record<string, number> = {
 }
 
 // Albarka functions
+function albarkaSlug(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+}
+
 async function fetchAlbarkaCategories(): Promise<{ id: string; name: string; service_id?: number }[]> {
-  // Albarka has a simpler structure - just network-based data plans
-  return [
-    { id: 'sme', name: 'SME' },
-    { id: 'gifting', name: 'Gifting' },
-    { id: 'corporate', name: 'Corporate' },
-  ]
+  const networkId = ALBARKA_NETWORK_IDS[currentNetwork]
+  if (!networkId) {
+    throw new Error(`Unknown network for Albarka: ${currentNetwork}`)
+  }
+
+  const plans = await fetchAlbarkaRawPlans(networkId)
+
+  // Derive categories from returned plan types (real-time, from API)
+  const types = new Map<string, string>()
+  for (const plan of plans) {
+    const rawType = String(plan.plan_type || plan.category || plan.type || '').trim()
+    if (!rawType) continue
+    types.set(albarkaSlug(rawType), rawType)
+  }
+
+  // Fallback (in case API returns plans but without plan_type)
+  if (types.size === 0) {
+    return [{ id: 'all', name: 'All Plans' }]
+  }
+
+  return Array.from(types.entries()).map(([id, name]) => ({ id, name }))
 }
 
 // Helper to get Albarka access token using Basic Auth
@@ -368,93 +391,136 @@ async function getAlbarkaAccessToken(): Promise<string | null> {
   }
 }
 
-async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
+async function fetchAlbarkaRawPlans(networkId: number): Promise<any[]> {
   const accessToken = await getAlbarkaAccessToken()
-
   if (!accessToken) {
-    console.error('Could not get Albarka access token')
-    return []
+    throw new Error('Could not get Albarka access token')
   }
 
+  let lastError: string | null = null
+
+  // Use the documented API host. The `app.` host returns HTML (web login), not API JSON.
+  const baseUrls = ['https://albarkasub.com/api']
+  const queryKeys = ['network', 'network_id']
+  const authSchemes = ['Token', 'Bearer']
+
+  const withTimeout = (ms: number) => {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), ms)
+    return { controller, timeoutId }
+  }
+
+  const tryRequest = async (url: string, init: RequestInit) => {
+    const { controller, timeoutId } = withTimeout(8000)
+    const res = await fetch(url, { ...init, signal: controller.signal })
+    const text = await res.text()
+    clearTimeout(timeoutId)
+    let json: any = null
+    try {
+      json = JSON.parse(text)
+    } catch {
+      // Not JSON
+    }
+    return { res, text, json }
+  }
+
+  // Try GET variations first
+  for (const baseUrl of baseUrls) {
+    for (const key of queryKeys) {
+      for (const scheme of authSchemes) {
+        const url = `${baseUrl}/data/?${key}=${networkId}`
+        try {
+          const { res, json, text } = await tryRequest(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `${scheme} ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+          })
+
+          if (!res.ok) {
+            console.error(`Albarka GET failed: ${res.status} ${url} (auth=${scheme})`)
+            console.error('Albarka error response:', text)
+            lastError = `${res.status} ${text}`
+            continue
+          }
+
+          if (!json) {
+            console.error(`Albarka GET returned non-JSON (likely HTML/login page): ${url} (auth=${scheme})`)
+            console.error('Albarka non-JSON response snippet:', text.slice(0, 160))
+            lastError = `non-json ${text.slice(0, 160)}`
+            continue
+          }
+
+          if (json && json.status === false) {
+            console.error(`Albarka GET returned status=false: ${url} (auth=${scheme})`)
+            console.error('Albarka error response:', JSON.stringify(json))
+            lastError = String(json.message || json.error || 'status=false')
+            continue
+          }
+
+          const allPlans = Array.isArray(json)
+            ? json
+            : (json?.data || json?.plans || json?.DATAPLANS || json?.DATAPLAN || null)
+
+          if (Array.isArray(allPlans)) return allPlans
+        } catch (e) {
+          console.error(`Albarka GET exception for ${url} (auth=${scheme}):`, e)
+          lastError = String(e)
+        }
+      }
+    }
+  }
+
+  throw new Error(
+    `Albarka API did not return plans (all endpoint variants failed). Last error: ${lastError ?? 'unknown'}. ` +
+      'If you keep seeing "contact admin", your Albarka account likely needs API/data access enabled by Albarka support.'
+  )
+}
+
+async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
   const networkId = ALBARKA_NETWORK_IDS[currentNetwork]
   if (!networkId) {
-    console.error(`Unknown network for Albarka: ${currentNetwork}`)
-    return []
+    throw new Error(`Unknown network for Albarka: ${currentNetwork}`)
   }
-  
-  try {
-    console.log(`Fetching Albarka plans for network ${currentNetwork} (ID: ${networkId})...`)
-    
-    // Fetch data plans using the access token
-    const response = await fetch(`https://albarkasub.com/api/data/?network=${networkId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Token ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    })
 
-    if (!response.ok) {
-      console.error(`Failed to fetch Albarka plans: ${response.status}`)
-      const errorText = await response.text()
-      console.error('Albarka error response:', errorText)
-      return []
+  console.log(`Fetching Albarka plans for network ${currentNetwork} (ID: ${networkId})...`)
+
+  const allPlans = await fetchAlbarkaRawPlans(networkId)
+
+  const filteredPlans = allPlans.filter((plan: any) => {
+    if (!categoryId || categoryId === 'all') return true
+    const rawType = String(plan.plan_type || plan.category || plan.type || '').trim()
+    if (!rawType) return true
+    return albarkaSlug(rawType) === categoryId
+  })
+
+  console.log(`Filtered ${filteredPlans.length} Albarka plans for ${currentNetwork}/${categoryId}`)
+
+  return filteredPlans.map((plan: any) => {
+    const planName = plan.plan_name || plan.plan || plan.name || plan.data_plan || ''
+    const dataAmount = extractDataAmount(planName)
+    const validity = extractValidity(planName)
+    const price = parseFloat(plan.plan_amount || plan.amount || plan.price || plan.data_amount || 0)
+    const planId = plan.plan_id || plan.dataplan_id || plan.id
+    const rawType = String(plan.plan_type || plan.category || plan.type || '').trim()
+
+    console.log(`Mapping Albarka plan: id=${planId}, name=${planName}, price=${price}`)
+
+    return {
+      provider: 'albarka',
+      network: currentNetwork,
+      category: categoryId,
+      service_id: null,
+      plan_id: String(planId),
+      product_id: String(planId),
+      name: rawType ? `${rawType} - ${planName}` : planName,
+      display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
+      data_amount: dataAmount,
+      validity: validity,
+      api_price: price,
     }
-
-    const data = await response.json()
-    console.log(`Albarka plans response:`, JSON.stringify(data).slice(0, 1000))
-
-    // Parse plans from response
-    const allPlans = Array.isArray(data) ? data : (data.data || data.plans || data.DATAPLANS || [])
-    
-    // Filter by category if needed
-    const filteredPlans = allPlans.filter((plan: any) => {
-      const planType = (plan.plan_type || plan.category || plan.type || '').toLowerCase()
-      
-      // Check category match
-      if (categoryId === 'sme') {
-        return planType.includes('sme')
-      }
-      if (categoryId === 'corporate') {
-        return planType.includes('cg') || planType.includes('corporate')
-      }
-      if (categoryId === 'gifting') {
-        // Gifting = plans that are not SME or CG
-        return !planType.includes('sme') && !planType.includes('cg') && !planType.includes('corporate')
-      }
-      
-      return true // Return all if category not matched
-    })
-
-    console.log(`Filtered ${filteredPlans.length} Albarka plans for ${currentNetwork}/${categoryId}`)
-
-    return filteredPlans.map((plan: any) => {
-      const planName = plan.plan_name || plan.plan || plan.name || plan.data_plan || ''
-      const dataAmount = extractDataAmount(planName)
-      const validity = extractValidity(planName)
-      const price = parseFloat(plan.plan_amount || plan.amount || plan.price || plan.data_amount || 0)
-      const planId = plan.plan_id || plan.dataplan_id || plan.id
-      
-      console.log(`Mapping Albarka plan: id=${planId}, name=${planName}, price=${price}`)
-      
-      return {
-        provider: 'albarka',
-        network: currentNetwork,
-        category: categoryId,
-        service_id: null,
-        plan_id: String(planId),
-        product_id: String(planId),
-        name: planName,
-        display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
-        data_amount: dataAmount,
-        validity: validity,
-        api_price: price
-      }
-    })
-  } catch (error) {
-    console.error(`Error fetching Albarka plans:`, error)
-    return []
-  }
+  })
 }
 
 // Provider configurations
