@@ -71,6 +71,7 @@ const NETWORKS = ['mtn', 'airtel', 'glo', '9mobile'];
 const PROVIDERS = [
   { id: 'isquare', name: 'iSquare' },
   { id: 'rgc', name: 'RGC Data' },
+  { id: 'albarka', name: 'Albarka' },
 ];
 
 export default function AdminDataPlans() {
