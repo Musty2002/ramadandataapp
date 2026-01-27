@@ -456,10 +456,11 @@ export default function Auth() {
               type="email"
               placeholder="you@example.com"
               inputMode="email"
-              autoComplete="email"
+              autoComplete="off"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
+              data-form-type="other"
               value={formData.email}
               onChange={handleChange}
               onFocus={registerFocus('email')}

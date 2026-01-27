@@ -354,13 +354,13 @@ export default function Airtime() {
             <Label htmlFor="amount">Amount</Label>
             <Input
               id="amount"
-              type="number"
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               placeholder="Enter amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
               className="mt-2"
-              min={50}
-              max={50000}
             />
           </div>
 
