@@ -217,8 +217,10 @@ Deno.serve(async (req) => {
           }
         }
       }
-    } else if (plan.provider === 'rgc') {
+  } else if (plan.provider === 'rgc') {
       apiResponse = await callRgcDataAPI(plan, cleanPhone, reference)
+    } else if (plan.provider === 'albarka') {
+      apiResponse = await callAlbarkaDataAPI(plan, cleanPhone, reference)
     }
 
     if (apiResponse?.error) {
@@ -465,6 +467,82 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
     }
   } catch (error: unknown) {
     console.error('RGC API call error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { error: `API call failed: ${message}` }
+  }
+}
+
+async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: string) {
+  try {
+    const apiToken = Deno.env.get('ALBARKA_API_TOKEN')
+
+    if (!apiToken) {
+      return { error: 'Albarka API token not configured' }
+    }
+
+    console.log('Calling Albarka API:', { plan_id: plan.plan_id, phone: phoneNumber, network: plan.network })
+
+    if (!plan.plan_id) {
+      return { error: 'Plan mapping missing (plan_id). Please choose another plan.' }
+    }
+
+    // Map network names to Albarka network IDs
+    const networkMap: Record<string, number> = {
+      'mtn': 1,
+      'airtel': 2,
+      'glo': 3,
+      '9mobile': 4
+    }
+
+    const networkId = networkMap[plan.network.toLowerCase()]
+    if (!networkId) {
+      return { error: 'Invalid network for Albarka' }
+    }
+
+    const response = await fetch('https://app.albarkasub.com/api/data/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        network: networkId,
+        phone: phoneNumber,
+        data_plan: plan.plan_id,
+        bypass: false,
+        'request-id': reference
+      })
+    })
+
+    const data = await (async () => {
+      try {
+        return await response.json()
+      } catch {
+        const text = await response.text().catch(() => '')
+        return { message: text || 'Invalid JSON from provider' }
+      }
+    })()
+    console.log('Albarka API response:', data)
+
+    if (!response.ok || data.error || data.Status === 'failed') {
+      return { 
+        error: data.api_response || data.message || data.error || 'Albarka API error',
+        raw: data
+      }
+    }
+
+    // Albarka returns Status: 'successful' on success
+    const isSuccess = data.Status === 'successful' || data.status === 'success' || 
+                      data.message?.toLowerCase().includes('success') ||
+                      (response.ok && !data.error && data.ident);
+    
+    return {
+      status: isSuccess ? 'success' : 'pending',
+      transaction_id: data.ident || data.id,
+      raw: data
+    }
+  } catch (error: unknown) {
+    console.error('Albarka API call error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { error: `API call failed: ${message}` }
   }

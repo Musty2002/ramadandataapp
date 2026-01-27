@@ -151,6 +151,8 @@ Deno.serve(async (req) => {
     let apiResponse
     if (selectedProvider === 'rgc') {
       apiResponse = await callRgcAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
+    } else if (selectedProvider === 'albarka') {
+      apiResponse = await callAlbarkaAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
     } else {
       apiResponse = await callIsquareAirtimeAPI(network.toLowerCase(), cleanPhone, amount, reference)
     }
@@ -371,6 +373,78 @@ async function callRgcAirtimeAPI(network: string, phoneNumber: string, amount: n
     }
   } catch (error: unknown) {
     console.error('RGC Airtime API call error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { error: `API call failed: ${message}` }
+  }
+}
+
+async function callAlbarkaAirtimeAPI(network: string, phoneNumber: string, amount: number, reference: string) {
+  try {
+    const apiToken = Deno.env.get('ALBARKA_API_TOKEN')
+
+    if (!apiToken) {
+      return { error: 'Albarka API token not configured' }
+    }
+
+    // Map network to Albarka network ID
+    const networkMap: Record<string, number> = {
+      'mtn': 1,
+      'airtel': 2,
+      'glo': 3,
+      '9mobile': 4
+    }
+
+    const networkId = networkMap[network]
+    if (!networkId) {
+      return { error: 'Invalid network' }
+    }
+
+    console.log('Calling Albarka Airtime API:', { network: networkId, phone: phoneNumber, amount })
+
+    const response = await fetch('https://app.albarkasub.com/api/topup/', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Token ${apiToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        network: networkId,
+        phone: phoneNumber,
+        amount: amount,
+        bypass: false,
+        'request-id': reference
+      })
+    })
+
+    const data = await (async () => {
+      try {
+        return await response.json()
+      } catch {
+        const text = await response.text().catch(() => '')
+        return { message: text || 'Invalid JSON from provider' }
+      }
+    })()
+    console.log('Albarka Airtime API response:', data)
+
+    if (!response.ok || data.error || data.Status === 'failed') {
+      return { 
+        error: data.api_response || data.message || data.error || 'Albarka API error',
+        raw: data
+      }
+    }
+
+    // Albarka returns Status: 'successful' on success
+    const isSuccess = data.Status === 'successful' || data.status === 'success' || 
+                      data.message?.toLowerCase().includes('success') ||
+                      (response.ok && !data.error && data.ident);
+
+    return {
+      status: isSuccess ? 'success' : 'pending',
+      transaction_id: data.ident || data.id,
+      raw: data
+    }
+  } catch (error: unknown) {
+    console.error('Albarka Airtime API call error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return { error: `API call failed: ${message}` }
   }
