@@ -305,6 +305,107 @@ function extractValidity(planName: string): string {
   return 'Monthly'
 }
 
+// Albarka network ID mapping
+const ALBARKA_NETWORK_IDS: Record<string, number> = {
+  mtn: 1,
+  airtel: 2,
+  glo: 3,
+  '9mobile': 4,
+}
+
+// Albarka functions
+async function fetchAlbarkaCategories(): Promise<{ id: string; name: string; service_id?: number }[]> {
+  // Albarka has a simpler structure - just network-based data plans
+  return [
+    { id: 'sme', name: 'SME' },
+    { id: 'gifting', name: 'Gifting' },
+    { id: 'corporate', name: 'Corporate' },
+  ]
+}
+
+async function fetchAlbarkaPlans(categoryId: string): Promise<any[]> {
+  const apiToken = Deno.env.get('ALBARKA_API_TOKEN')
+
+  if (!apiToken) {
+    throw new Error('Albarka API token not configured')
+  }
+
+  const networkId = ALBARKA_NETWORK_IDS[currentNetwork]
+  if (!networkId) {
+    console.error(`Unknown network for Albarka: ${currentNetwork}`)
+    return []
+  }
+  
+  try {
+    console.log(`Fetching Albarka plans for network ${currentNetwork} (ID: ${networkId})...`)
+    
+    const response = await fetch(`https://app.albarkasub.com/api/data/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Token ${apiToken}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (!response.ok) {
+      console.error(`Failed to fetch Albarka plans: ${response.status}`)
+      const errorText = await response.text()
+      console.error('Albarka error response:', errorText)
+      return []
+    }
+
+    const data = await response.json()
+    console.log(`Albarka plans response:`, JSON.stringify(data).slice(0, 1000))
+
+    // Filter plans by network ID and category
+    const allPlans = Array.isArray(data) ? data : (data.data || data.plans || [])
+    
+    const filteredPlans = allPlans.filter((plan: any) => {
+      const planNetwork = plan.network || plan.network_id
+      const planCategory = (plan.plan_type || plan.category || '').toLowerCase()
+      
+      // Check network match
+      if (String(planNetwork) !== String(networkId)) return false
+      
+      // Check category match
+      if (categoryId === 'sme' && planCategory.includes('sme')) return true
+      if (categoryId === 'corporate' && (planCategory.includes('cg') || planCategory.includes('corporate'))) return true
+      if (categoryId === 'gifting' && (planCategory.includes('gift') || (!planCategory.includes('sme') && !planCategory.includes('cg') && !planCategory.includes('corporate')))) return true
+      
+      return categoryId === 'gifting' // Default to gifting if no category match
+    })
+
+    console.log(`Filtered ${filteredPlans.length} Albarka plans for ${currentNetwork}/${categoryId}`)
+
+    return filteredPlans.map((plan: any) => {
+      const planName = plan.plan_name || plan.name || plan.plan || ''
+      const dataAmount = extractDataAmount(planName)
+      const validity = extractValidity(planName)
+      const price = parseFloat(plan.plan_amount || plan.amount || plan.price || 0)
+      const planId = plan.plan_id || plan.id
+      
+      console.log(`Mapping Albarka plan: id=${planId}, name=${planName}`)
+      
+      return {
+        provider: 'albarka',
+        network: currentNetwork,
+        category: categoryId,
+        service_id: null,
+        plan_id: String(planId),
+        product_id: String(planId),
+        name: planName,
+        display_name: `${currentNetwork.toUpperCase()} ${dataAmount} ${validity}`.trim(),
+        data_amount: dataAmount,
+        validity: validity,
+        api_price: price
+      }
+    })
+  } catch (error) {
+    console.error(`Error fetching Albarka plans:`, error)
+    return []
+  }
+}
+
 // Provider configurations
 const PROVIDERS: Record<string, {
   name: string;
@@ -320,6 +421,11 @@ const PROVIDERS: Record<string, {
     name: 'RGC Data',
     fetchCategories: fetchRgcCategories,
     fetchPlans: fetchRgcPlans,
+  },
+  albarka: {
+    name: 'Albarka',
+    fetchCategories: fetchAlbarkaCategories,
+    fetchPlans: fetchAlbarkaPlans,
   },
 }
 
