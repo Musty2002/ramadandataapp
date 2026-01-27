@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useKeyboardSafeInput } from '@/hooks/useKeyboardSafeInput';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 const signUpSchema = z.object({
@@ -38,6 +39,7 @@ export default function Auth() {
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { registerFocus, shouldIgnoreEmailBlank } = useKeyboardSafeInput();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -49,7 +51,11 @@ export default function Auth() {
       name === 'email' &&
       value === '' &&
       formData.email &&
-      (document.activeElement?.getAttribute('name') === 'password' || (document.activeElement as any)?.id === 'password')
+      (
+        document.activeElement?.getAttribute('name') === 'password' ||
+        (document.activeElement as any)?.id === 'password' ||
+        shouldIgnoreEmailBlank(value, formData.email)
+      )
     ) {
       return;
     }
@@ -146,7 +152,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 py-12 bg-background">
+    <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
       {/* Logo */}
       <div className="mb-8 text-center">
         <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
@@ -187,6 +193,7 @@ export default function Auth() {
                   autoComplete="name"
                   value={formData.fullName}
                   onChange={handleChange}
+                  onFocus={registerFocus('fullName')}
                   className={errors.fullName ? 'border-destructive' : ''}
                 />
                 {errors.fullName && (
@@ -205,6 +212,7 @@ export default function Auth() {
                   autoComplete="tel"
                   value={formData.phone}
                   onChange={handleChange}
+                  onFocus={registerFocus('phone')}
                   className={errors.phone ? 'border-destructive' : ''}
                 />
                 {errors.phone && (
@@ -228,6 +236,7 @@ export default function Auth() {
               spellCheck={false}
               value={formData.email}
               onChange={handleChange}
+              onFocus={registerFocus('email')}
               className={errors.email ? 'border-destructive' : ''}
             />
             {errors.email && (
@@ -246,6 +255,7 @@ export default function Auth() {
                 autoComplete={isLogin ? 'current-password' : 'new-password'}
                 value={formData.password}
                 onChange={handleChange}
+                onFocus={registerFocus('password')}
                 className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
               />
               <button
@@ -271,6 +281,7 @@ export default function Auth() {
                 autoComplete="off"
                 value={formData.referralCode}
                 onChange={handleChange}
+                onFocus={registerFocus('referralCode')}
               />
             </div>
           )}
