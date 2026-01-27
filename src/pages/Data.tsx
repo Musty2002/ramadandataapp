@@ -474,13 +474,30 @@ export default function Data() {
                 <Input
                   id="phone"
                   type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="tel"
                   placeholder="08012345678"
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                  onChange={(e) => {
+                    // Get raw value and filter to digits only
+                    const rawValue = e.target.value;
+                    const digitsOnly = rawValue.replace(/\D/g, '');
+                    // Always update state to allow backspace to work
+                    setPhoneNumber(digitsOnly);
+                  }}
+                  onKeyDown={(e) => {
+                    // Allow: backspace, delete, tab, escape, enter, arrows
+                    const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+                    if (allowedKeys.includes(e.key)) {
+                      return;
+                    }
+                    // Block non-numeric input
+                    if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                      e.preventDefault();
+                    }
+                  }}
                   className="mt-2 h-12 text-lg"
                   maxLength={11}
+                  autoComplete="tel"
                 />
               </div>
 

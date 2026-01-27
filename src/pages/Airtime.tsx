@@ -325,22 +325,36 @@ export default function Airtime() {
             <Input
               id="phone"
               type="tel"
-              inputMode="numeric"
-              pattern="[0-9]*"
+              inputMode="tel"
               placeholder="08012345678"
               value={phoneNumber}
               onChange={(e) => {
-                const value = e.target.value.replace(/\D/g, '');
-                setPhoneNumber(value);
+                // Get raw value and filter to digits only
+                const rawValue = e.target.value;
+                const digitsOnly = rawValue.replace(/\D/g, '');
+                // Always update state to allow backspace to work
+                setPhoneNumber(digitsOnly);
                 
                 // Auto-detect network from phone number
-                const detected = detectNetwork(value);
+                const detected = detectNetwork(digitsOnly);
                 if (detected && detected !== selectedNetwork) {
                   setSelectedNetwork(detected);
                 }
               }}
+              onKeyDown={(e) => {
+                // Allow: backspace, delete, tab, escape, enter, arrows
+                const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+                if (allowedKeys.includes(e.key)) {
+                  return;
+                }
+                // Block non-numeric input
+                if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                }
+              }}
               className="mt-2"
               maxLength={11}
+              autoComplete="tel"
             />
             {selectedNetwork && phoneNumber.length >= 4 && (
               <p className="text-xs text-muted-foreground mt-1">
@@ -354,12 +368,24 @@ export default function Airtime() {
             <Label htmlFor="amount">Amount</Label>
             <Input
               id="amount"
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
+              type="tel"
+              inputMode="tel"
               placeholder="Enter amount"
               value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ''))}
+              onChange={(e) => {
+                const rawValue = e.target.value;
+                const digitsOnly = rawValue.replace(/\D/g, '');
+                setAmount(digitsOnly);
+              }}
+              onKeyDown={(e) => {
+                const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+                if (allowedKeys.includes(e.key)) {
+                  return;
+                }
+                if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                }
+              }}
               className="mt-2"
             />
           </div>
