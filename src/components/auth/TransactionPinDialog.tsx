@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Delete, AlertCircle } from 'lucide-react';
+import { Delete, AlertCircle, Fingerprint, Loader2 } from 'lucide-react';
+import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 interface TransactionPinDialogProps {
@@ -15,6 +16,7 @@ interface TransactionPinDialogProps {
 
 const PIN_LENGTH = 4;
 const TRANSACTION_PIN_HASH_KEY = 'transaction_pin_hash';
+const BIOMETRIC_FOR_TRANSACTIONS_KEY = 'biometric_for_transactions';
 
 // Simple hash function for PIN (for local storage only)
 async function hashPin(pin: string): Promise<string> {
@@ -40,6 +42,18 @@ export function clearTransactionPin(): void {
   localStorage.removeItem(TRANSACTION_PIN_HASH_KEY);
 }
 
+export function isBiometricForTransactionsEnabled(): boolean {
+  return localStorage.getItem(BIOMETRIC_FOR_TRANSACTIONS_KEY) === 'true';
+}
+
+export function setBiometricForTransactions(enabled: boolean): void {
+  if (enabled) {
+    localStorage.setItem(BIOMETRIC_FOR_TRANSACTIONS_KEY, 'true');
+  } else {
+    localStorage.removeItem(BIOMETRIC_FOR_TRANSACTIONS_KEY);
+  }
+}
+
 export function TransactionPinDialog({
   open,
   onOpenChange,
@@ -53,6 +67,16 @@ export function TransactionPinDialog({
   const [step, setStep] = useState<'enter' | 'confirm' | 'verify'>('enter');
   const [error, setError] = useState('');
   const [shake, setShake] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+
+  const { 
+    isAvailable: biometricAvailable, 
+    verifyIdentity, 
+    getBiometricLabel 
+  } = useBiometricAuth();
+
+  const biometricEnabled = isBiometricForTransactionsEnabled();
+  const showBiometricOption = mode === 'verify' && biometricAvailable && biometricEnabled;
 
   useEffect(() => {
     if (open) {
@@ -62,6 +86,36 @@ export function TransactionPinDialog({
       setStep(mode === 'verify' ? 'verify' : 'enter');
     }
   }, [open, mode]);
+
+  const handleBiometricVerify = useCallback(async () => {
+    setBiometricLoading(true);
+    try {
+      const success = await verifyIdentity('Verify your identity to authorize this transaction');
+      if (success) {
+        onComplete();
+        onOpenChange(false);
+      } else {
+        setError('Biometric verification failed');
+        triggerShake();
+      }
+    } catch {
+      setError('Biometric verification failed');
+      triggerShake();
+    } finally {
+      setBiometricLoading(false);
+    }
+  }, [verifyIdentity, onComplete, onOpenChange]);
+
+  // Auto-trigger biometric if it's the preferred method
+  useEffect(() => {
+    if (open && showBiometricOption && mode === 'verify') {
+      // Small delay to let the dialog render
+      const timer = setTimeout(() => {
+        handleBiometricVerify();
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [open, showBiometricOption, mode, handleBiometricVerify]);
 
   const handleDigit = async (digit: string) => {
     setError('');
@@ -125,14 +179,14 @@ export function TransactionPinDialog({
 
   const getTitle = () => {
     if (title) return title;
-    if (mode === 'verify') return 'Enter Transaction PIN';
+    if (mode === 'verify') return 'Authorize Transaction';
     if (step === 'confirm') return 'Confirm Your PIN';
     return 'Set Transaction PIN';
   };
 
   const getDescription = () => {
     if (description) return description;
-    if (mode === 'verify') return 'Enter your 4-digit PIN to authorize this transaction';
+    if (mode === 'verify') return 'Enter your PIN or use biometric to authorize';
     if (step === 'confirm') return 'Re-enter your PIN to confirm';
     return 'Create a 4-digit PIN to secure your transactions';
   };
@@ -151,6 +205,33 @@ export function TransactionPinDialog({
         </DialogHeader>
 
         <div className="mt-6">
+          {/* Biometric Option for Verify Mode */}
+          {showBiometricOption && (
+            <div className="mb-6">
+              <Button
+                variant="outline"
+                className="w-full h-14 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+                onClick={handleBiometricVerify}
+                disabled={biometricLoading}
+              >
+                {biometricLoading ? (
+                  <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                ) : (
+                  <Fingerprint className="w-5 h-5 mr-2 text-primary" />
+                )}
+                <span>Use {getBiometricLabel()}</span>
+              </Button>
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or enter PIN</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* PIN Dots */}
           <div className={`flex justify-center gap-4 mb-8 ${shake ? 'animate-shake' : ''}`}>
             {Array.from({ length: PIN_LENGTH }).map((_, i) => (

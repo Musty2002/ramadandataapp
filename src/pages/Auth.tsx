@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Fingerprint, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useKeyboardSafeInput } from '@/hooks/useKeyboardSafeInput';
+import { useBiometricAuth } from '@/hooks/useBiometricAuth';
+import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 const signUpSchema = z.object({
@@ -27,6 +29,10 @@ export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -40,13 +46,22 @@ export default function Auth() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { registerFocus, shouldIgnoreEmailBlank } = useKeyboardSafeInput();
+  const { 
+    isAvailable: biometricAvailable, 
+    isEnabled: biometricEnabled,
+    hasStoredCredentials,
+    getCredentials,
+    setCredentials,
+    getBiometricLabel,
+  } = useBiometricAuth();
+
+  const storedCreds = hasStoredCredentials();
+  const showBiometricLogin = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
 
-    // Some Android WebViews emit a spurious empty "change" for the email field
-    // right when the user focuses the password input (autofill/focus quirk).
-    // Guard against wiping an already-entered email.
+    // Guard against wiping an already-entered email on some Android devices
     if (
       name === 'email' &&
       value === '' &&
@@ -62,6 +77,83 @@ export default function Auth() {
 
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: '' }));
+  };
+
+  const handleBiometricLogin = async () => {
+    setBiometricLoading(true);
+    try {
+      const credentials = await getCredentials();
+      if (credentials) {
+        const { error } = await signIn(credentials.email, credentials.password);
+        if (error) {
+          toast({
+            variant: 'destructive',
+            title: 'Login Failed',
+            description: error.message === 'Invalid login credentials' 
+              ? 'Saved credentials are no longer valid. Please login with email/password.'
+              : error.message,
+          });
+        } else {
+          navigate('/dashboard');
+        }
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Authentication Failed',
+          description: 'Biometric verification failed. Please try again or use password.',
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Biometric authentication failed.',
+      });
+    } finally {
+      setBiometricLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!resetEmail) {
+      toast({
+        variant: 'destructive',
+        title: 'Email Required',
+        description: 'Please enter your email address.',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) {
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: error.message,
+        });
+      } else {
+        setResetSent(true);
+        toast({
+          title: 'Reset Email Sent',
+          description: 'Check your email for the password reset link.',
+        });
+      }
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to send reset email. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -94,6 +186,14 @@ export default function Auth() {
               : error.message,
           });
         } else {
+          // Offer to enable biometric if available and not already enabled
+          if (biometricAvailable && !biometricEnabled) {
+            await setCredentials(formData.email, formData.password);
+            toast({
+              title: 'Biometric Enabled',
+              description: `You can now use ${getBiometricLabel()} to sign in faster.`,
+            });
+          }
           navigate('/dashboard');
         }
       } else {
@@ -151,6 +251,76 @@ export default function Auth() {
     }
   };
 
+  // Forgot password modal/view
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
+        <div className="mb-8 text-center">
+          <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
+          <h1 className="text-2xl font-bold text-primary">Reset Password</h1>
+          <p className="text-muted-foreground text-sm mt-1">Enter your email to receive a reset link</p>
+        </div>
+
+        <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg p-6">
+          {resetSent ? (
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="font-semibold text-lg">Check Your Email</h3>
+              <p className="text-sm text-muted-foreground">
+                We've sent a password reset link to <strong>{resetEmail}</strong>
+              </p>
+              <Button
+                variant="outline"
+                className="w-full mt-4"
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  setResetSent(false);
+                  setResetEmail('');
+                }}
+              >
+                Back to Login
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleForgotPassword} className="space-y-4">
+              <div>
+                <Label htmlFor="resetEmail">Email Address</Label>
+                <Input
+                  id="resetEmail"
+                  type="email"
+                  placeholder="you@example.com"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  className="mt-2"
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? 'Sending...' : 'Send Reset Link'}
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowForgotPassword(false)}
+              >
+                Back to Login
+              </Button>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
       {/* Logo */}
@@ -159,6 +329,38 @@ export default function Auth() {
         <h1 className="text-2xl font-bold text-primary">Ramadan Data App</h1>
         <p className="text-muted-foreground text-sm mt-1">Your trusted payment partner</p>
       </div>
+
+      {/* Biometric Quick Login */}
+      {showBiometricLogin && (
+        <div className="w-full max-w-sm mb-4">
+          <Button
+            variant="outline"
+            className="w-full h-14 border-2 border-primary/20 hover:border-primary/40 hover:bg-primary/5"
+            onClick={handleBiometricLogin}
+            disabled={biometricLoading}
+          >
+            {biometricLoading ? (
+              <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+            ) : (
+              <Fingerprint className="w-5 h-5 mr-2 text-primary" />
+            )}
+            <span>
+              Sign in with {getBiometricLabel()}
+            </span>
+          </Button>
+          <p className="text-xs text-center text-muted-foreground mt-2">
+            Welcome back, {storedCreds?.email}
+          </p>
+          <div className="relative my-4">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form Card */}
       <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg p-6">
@@ -270,6 +472,16 @@ export default function Auth() {
               <p className="text-xs text-destructive mt-1">{errors.password}</p>
             )}
           </div>
+
+          {isLogin && (
+            <button
+              type="button"
+              onClick={() => setShowForgotPassword(true)}
+              className="text-sm text-primary hover:underline"
+            >
+              Forgot password?
+            </button>
+          )}
 
           {!isLogin && (
             <div>
