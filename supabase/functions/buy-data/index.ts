@@ -512,14 +512,15 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
     })
 
     const tokenData = await (async () => {
+      const text = await tokenResponse.text().catch(() => '')
+      console.log('Albarka raw token response:', { status: tokenResponse.status, text: text.substring(0, 500) })
       try {
-        return await tokenResponse.json()
+        return JSON.parse(text)
       } catch {
-        const text = await tokenResponse.text().catch(() => '')
         return { message: text || 'Invalid JSON from provider' }
       }
     })()
-    console.log('Albarka token response:', tokenData)
+    console.log('Albarka token response parsed:', tokenData)
 
     if (!tokenResponse.ok || tokenData.status === 'fail' || !tokenData.AccessToken) {
       return { 
