@@ -474,11 +474,13 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
 
 async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: string) {
   try {
-    // ALBARKA_API_TOKEN is the pre-encoded base64(username:password)
-    const encodedCredentials = Deno.env.get('ALBARKA_API_TOKEN')
+    // Get username and password from environment
+    const username = Deno.env.get('ALBARKA_USERNAME')
+    const password = Deno.env.get('ALBARKA_PASSWORD')
 
-    if (!encodedCredentials) {
-      return { error: 'Albarka API token not configured' }
+    if (!username || !password) {
+      console.error('Missing Albarka credentials')
+      return { error: 'Albarka API credentials not configured' }
     }
 
     console.log('Calling Albarka API:', { plan_id: plan.plan_id, phone: phoneNumber, network: plan.network })
@@ -487,7 +489,8 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Plan mapping missing (plan_id). Please choose another plan.' }
     }
 
-    // Map network names to Albarka network IDs
+    // Map network names to Albarka network IDs (from API docs)
+    // MTN=1, Airtel=2, Glo=3, 9mobile=4
     const networkMap: Record<string, number> = {
       'mtn': 1,
       'airtel': 2,
@@ -501,6 +504,8 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
     }
 
     // Step 1: Get AccessToken using POST with Basic Auth
+    // Per docs: POST to /api/user with Authorization: Basic base64(username:password)
+    const encodedCredentials = btoa(`${username}:${password}`)
     console.log('Fetching Albarka AccessToken...')
     
     const tokenResponse = await fetch('https://albarkasub.com/api/user', {
@@ -520,6 +525,7 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid response from Albarka auth endpoint', raw: tokenText.substring(0, 200) }
     }
 
+    // Expected: { "status": "success", "AccessToken": "...", "balance": "...", "username": "..." }
     if (tokenData.status !== 'success' || !tokenData.AccessToken) {
       return { 
         error: tokenData.message || 'Failed to get Albarka AccessToken',
@@ -528,9 +534,11 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
     }
 
     const accessToken = tokenData.AccessToken
-    console.log('Albarka AccessToken obtained successfully')
+    console.log('Albarka AccessToken obtained successfully, balance:', tokenData.balance)
 
     // Step 2: Make data purchase with the AccessToken
+    // Per docs: POST to /api/data with Authorization: Token {AccessToken}
+    // Body: { network, phone, data_plan, bypass, request-id }
     const payload = {
       network: networkId,
       phone: phoneNumber,
@@ -559,19 +567,20 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid response from Albarka data endpoint', raw: responseText.substring(0, 200) }
     }
 
+    // Check for failure
     if (data.status === 'failed' || data.Status === 'failed' || data.error) {
       return { 
-        error: data.api_response || data.message || data.error || 'Albarka API error',
+        error: data.message || data.api_response || data.error || 'Albarka API error',
         raw: data
       }
     }
 
-    // Albarka returns status: 'success' on success
-    const isSuccess = data.status === 'success' || data.Status === 'successful'
+    // Expected success response includes: status, message, network, phone_number, dataplan, etc.
+    const isSuccess = data.status === 'success'
     
     return {
       status: isSuccess ? 'success' : 'pending',
-      transaction_id: data.ident || data['request-id'] || data.id,
+      transaction_id: data['request-id'] || data.ident || data.id,
       raw: data
     }
   } catch (error: unknown) {
