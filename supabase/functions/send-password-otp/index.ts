@@ -78,7 +78,7 @@ serve(async (req) => {
     const resend = new Resend(resendApiKey);
 
     const { error: emailError } = await resend.emails.send({
-      from: "Ramadan Data <noreply@ramadandataapp.com.ng>",
+      from: "Ramadan Data <onboarding@resend.dev>",
       to: [email],
       subject: "Password Reset Code - Ramadan Data",
       html: `
