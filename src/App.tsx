@@ -8,7 +8,7 @@ import { PushNotificationProvider } from "@/components/PushNotificationProvider"
 import { NetworkStatusIndicator } from "@/components/NetworkStatus";
 import SplashScreen from "@/components/SplashScreen";
 import { useAppReady } from "@/hooks/useAppReady";
-
+import { AppLockGate } from "@/components/AppLockGate";
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -69,7 +69,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  return <>{children}</>;
+  // Wrap with AppLockGate to enforce PIN/biometric on cold start
+  return <AppLockGate>{children}</AppLockGate>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -282,7 +283,7 @@ const App = () => {
         <Toaster />
         <Sonner />
         {showSplash && (
-          <SplashScreen onComplete={markReady} minDisplayTime={2500} />
+          <SplashScreen onComplete={markReady} minDisplayTime={4000} />
         )}
         <BrowserRouter>
           <AuthProvider>
