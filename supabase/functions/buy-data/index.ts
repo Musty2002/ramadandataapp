@@ -500,11 +500,11 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid network for Albarka' }
     }
 
-    // Step 1: Get AccessToken using Basic Auth (encodedCredentials is already base64)
+    // Step 1: Get AccessToken using POST with Basic Auth (encodedCredentials is already base64)
     console.log('Fetching Albarka AccessToken...')
     
     const tokenResponse = await fetch('https://albarkasub.com/api/user/', {
-      method: 'GET',
+      method: 'POST',
       headers: {
         'Authorization': `Basic ${encodedCredentials}`,
         'Content-Type': 'application/json'
