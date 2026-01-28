@@ -500,14 +500,44 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid network for Albarka' }
     }
 
-    // Albarka uses base64-encoded username:password as the Token
-    const authToken = btoa(`${username}:${password}`)
+    // Step 1: Get AccessToken using Basic Auth
+    const basicAuth = btoa(`${username}:${password}`)
+    console.log('Fetching Albarka AccessToken...')
+    
+    const tokenResponse = await fetch('https://albarkasub.com/api/user/', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${basicAuth}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    const tokenData = await (async () => {
+      try {
+        return await tokenResponse.json()
+      } catch {
+        const text = await tokenResponse.text().catch(() => '')
+        return { message: text || 'Invalid JSON from provider' }
+      }
+    })()
+    console.log('Albarka token response:', tokenData)
+
+    if (!tokenResponse.ok || tokenData.status === 'fail' || !tokenData.AccessToken) {
+      return { 
+        error: tokenData.message || 'Failed to get Albarka AccessToken',
+        raw: tokenData
+      }
+    }
+
+    const accessToken = tokenData.AccessToken
+
+    // Step 2: Make data purchase with the AccessToken
     console.log('Albarka request payload:', { network: networkId, phone: phoneNumber, data_plan: plan.plan_id, bypass: false, 'request-id': reference })
 
     const response = await fetch('https://albarkasub.com/api/data/', {
       method: 'POST',
       headers: {
-        'Authorization': `Token ${authToken}`,
+        'Authorization': `Token ${accessToken}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
