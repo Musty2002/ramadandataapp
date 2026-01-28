@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -64,42 +65,66 @@ serve(async (req) => {
       throw new Error("Failed to generate OTP");
     }
 
-    console.log(`OTP ${otpCode} generated for ${email}, expires at ${expiresAt.toISOString()}`);
+    console.log(`OTP generated for ${email}, expires at ${expiresAt.toISOString()}`);
 
-    // Send OTP email using Supabase's auth.admin.inviteUserByEmail with custom data
-    // Since we can't directly send custom emails, we'll use the generateLink approach
-    // and include the OTP in metadata, then rely on email hooks or templates
+    // Send OTP email using Resend
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
     
-    // Alternative: Use Supabase's magic link but with a custom redirect containing the OTP
-    // This way the user still gets an email, even if it's a link format
-    // But we verify using our OTP table
-    
-    // For now, let's send the OTP via the recovery email system
-    // The user will receive an email - we'll modify the approach
-    
-    // Use recovery email which includes a token, but we'll verify with our OTP
-    const { error: emailError } = await supabaseAdmin.auth.resetPasswordForEmail(email, {
-      redirectTo: `${req.headers.get("origin") || "https://ramadandataapp.com.ng"}/auth`,
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY not configured");
+      throw new Error("Email service not configured");
+    }
+
+    const resend = new Resend(resendApiKey);
+
+    const { error: emailError } = await resend.emails.send({
+      from: "Ramadan Data <noreply@ramadandataapp.com.ng>",
+      to: [email],
+      subject: "Password Reset Code - Ramadan Data",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0;">
+          <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            <h1 style="color: #18181b; font-size: 24px; font-weight: 600; text-align: center; margin: 0 0 8px 0;">Password Reset</h1>
+            <p style="color: #71717a; font-size: 14px; text-align: center; margin: 0 0 32px 0;">Ramadan Data App</p>
+            
+            <p style="color: #3f3f46; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+              You requested to reset your password. Use the code below to complete the process:
+            </p>
+            
+            <div style="background-color: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+              <span style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #18181b;">${otpCode}</span>
+            </div>
+            
+            <p style="color: #71717a; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
+              This code expires in <strong>10 minutes</strong>.
+            </p>
+            
+            <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 24px 0 0 0;">
+              If you didn't request this, you can safely ignore this email.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
     });
 
     if (emailError) {
-      console.error("Error sending recovery email:", emailError);
-      // Even if email fails, the OTP is stored - user can try resending
+      console.error("Error sending email via Resend:", emailError);
+      throw new Error("Failed to send reset code email");
     }
 
-    // Note: The default Supabase email template sends a link
-    // For a true OTP experience, you'd need to configure custom email templates
-    // or use a service like Resend with a custom template showing the OTP code
-    
-    // For testing/development, we'll return success and log the OTP
-    // In production, configure Supabase email templates or use Resend
+    console.log(`OTP email sent successfully to ${email}`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Password reset code sent to your email. Check your inbox.",
-        // Include OTP in response for testing - REMOVE IN PRODUCTION
-        debug_otp: otpCode
+        message: "Password reset code sent to your email. Check your inbox."
       }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
