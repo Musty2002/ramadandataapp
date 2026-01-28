@@ -500,7 +500,7 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid network for Albarka' }
     }
 
-    // Step 1: Get AccessToken using POST with Basic Auth (encodedCredentials is already base64)
+    // Step 1: Get AccessToken using POST with Basic Auth
     console.log('Fetching Albarka AccessToken...')
     
     const tokenResponse = await fetch('https://albarkasub.com/api/user', {
@@ -510,18 +510,17 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       }
     })
 
-    const tokenData = await (async () => {
-      const text = await tokenResponse.text().catch(() => '')
-      console.log('Albarka raw token response:', { status: tokenResponse.status, text: text.substring(0, 500) })
-      try {
-        return JSON.parse(text)
-      } catch {
-        return { message: text || 'Invalid JSON from provider' }
-      }
-    })()
-    console.log('Albarka token response parsed:', tokenData)
+    const tokenText = await tokenResponse.text()
+    console.log('Albarka token raw response:', { status: tokenResponse.status, body: tokenText.substring(0, 500) })
+    
+    let tokenData: any
+    try {
+      tokenData = JSON.parse(tokenText)
+    } catch {
+      return { error: 'Invalid response from Albarka auth endpoint', raw: tokenText.substring(0, 200) }
+    }
 
-    if (!tokenResponse.ok || tokenData.status === 'fail' || !tokenData.AccessToken) {
+    if (tokenData.status !== 'success' || !tokenData.AccessToken) {
       return { 
         error: tokenData.message || 'Failed to get Albarka AccessToken',
         raw: tokenData
@@ -529,50 +528,50 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
     }
 
     const accessToken = tokenData.AccessToken
+    console.log('Albarka AccessToken obtained successfully')
 
     // Step 2: Make data purchase with the AccessToken
-    console.log('Albarka request payload:', { network: networkId, phone: phoneNumber, data_plan: plan.plan_id, bypass: false, 'request-id': reference })
+    const payload = {
+      network: networkId,
+      phone: phoneNumber,
+      data_plan: plan.plan_id,
+      bypass: false,
+      'request-id': reference
+    }
+    console.log('Albarka data request payload:', payload)
 
-    const response = await fetch('https://albarkasub.com/api/data/', {
+    const response = await fetch('https://albarkasub.com/api/data', {
       method: 'POST',
       headers: {
         'Authorization': `Token ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        network: networkId,
-        phone: phoneNumber,
-        data_plan: plan.plan_id,
-        bypass: false,
-        'request-id': reference
-      })
+      body: JSON.stringify(payload)
     })
 
-    const data = await (async () => {
-      try {
-        return await response.json()
-      } catch {
-        const text = await response.text().catch(() => '')
-        return { message: text || 'Invalid JSON from provider' }
-      }
-    })()
-    console.log('Albarka API response:', data)
+    const responseText = await response.text()
+    console.log('Albarka data raw response:', { status: response.status, body: responseText.substring(0, 500) })
+    
+    let data: any
+    try {
+      data = JSON.parse(responseText)
+    } catch {
+      return { error: 'Invalid response from Albarka data endpoint', raw: responseText.substring(0, 200) }
+    }
 
-    if (!response.ok || data.error || data.Status === 'failed') {
+    if (data.status === 'failed' || data.Status === 'failed' || data.error) {
       return { 
         error: data.api_response || data.message || data.error || 'Albarka API error',
         raw: data
       }
     }
 
-    // Albarka returns Status: 'successful' on success
-    const isSuccess = data.Status === 'successful' || data.status === 'success' || 
-                      data.message?.toLowerCase().includes('success') ||
-                      (response.ok && !data.error && data.ident);
+    // Albarka returns status: 'success' on success
+    const isSuccess = data.status === 'success' || data.Status === 'successful'
     
     return {
       status: isSuccess ? 'success' : 'pending',
-      transaction_id: data.ident || data.id,
+      transaction_id: data.ident || data['request-id'] || data.id,
       raw: data
     }
   } catch (error: unknown) {
