@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PushNotificationProvider } from "@/components/PushNotificationProvider";
 import { NetworkStatusIndicator } from "@/components/NetworkStatus";
-
+import SplashScreen from "@/components/SplashScreen";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -264,21 +265,44 @@ function AppRoutes() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <PushNotificationProvider>
-            <NetworkStatusIndicator />
-            <AppRoutes />
-          </PushNotificationProvider>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  const [showSplash, setShowSplash] = useState(true);
+  const [splashComplete, setSplashComplete] = useState(false);
+
+  // Check if splash was shown this session
+  useEffect(() => {
+    const splashShown = sessionStorage.getItem('splashShown');
+    if (splashShown) {
+      setShowSplash(false);
+      setSplashComplete(true);
+    }
+  }, []);
+
+  const handleSplashComplete = () => {
+    sessionStorage.setItem('splashShown', 'true');
+    setSplashComplete(true);
+    setShowSplash(false);
+  };
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        {showSplash && !splashComplete && (
+          <SplashScreen onComplete={handleSplashComplete} minDisplayTime={2500} />
+        )}
+        <BrowserRouter>
+          <AuthProvider>
+            <PushNotificationProvider>
+              <NetworkStatusIndicator />
+              <AppRoutes />
+            </PushNotificationProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
