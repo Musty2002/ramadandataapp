@@ -11,6 +11,17 @@
       "has": [
         {
           "type": "host",
+          "value": "ramadandataapp.com.ng"
+        }
+      ],
+      "destination": "/website",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
           "value": "www.ramadandataapp.com.ng"
         }
       ],
