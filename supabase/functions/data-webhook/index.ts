@@ -22,11 +22,12 @@ Deno.serve(async (req) => {
     console.log('Data webhook received:', JSON.stringify(body, null, 2))
 
     // Extract reference and status from webhook payload
+    // Albarka format: { "request-id", status, response }
     // iSquare format: { reference, status, message, ... }
     // RGC format: { reference, status, ... }
-    const reference = body.reference || body.transaction_reference
+    const reference = body['request-id'] || body.reference || body.transaction_reference
     const status = body.status?.toLowerCase()
-    const message = body.message || body.description || ''
+    const message = body.response || body.message || body.description || ''
 
     if (!reference) {
       console.error('Missing reference in webhook payload')
@@ -36,7 +37,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    console.log('Processing webhook:', { reference, status, message })
+    console.log('Processing webhook:', { reference, status, message, provider: body['request-id'] ? 'albarka' : 'other' })
 
     // Find the transaction by reference
     const { data: transaction, error: txError } = await supabase
