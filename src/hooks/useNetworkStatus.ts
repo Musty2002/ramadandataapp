@@ -16,24 +16,39 @@ export function useNetworkStatus() {
   const [isReconnecting, setIsReconnecting] = useState(false);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const lastOnlineRef = useRef(navigator.onLine);
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 3;
 
   const reconnectRealtime = useCallback(async () => {
     if (isReconnecting) return;
     
+    // Limit reconnection attempts
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      console.log('[NetworkStatus] Max reconnect attempts reached, waiting for next trigger');
+      reconnectAttemptsRef.current = 0;
+      return;
+    }
+    
     setIsReconnecting(true);
+    reconnectAttemptsRef.current++;
     
     try {
       // Get all active channels and reconnect them
       const channels = supabase.getChannels();
       
       for (const channel of channels) {
-        // Unsubscribe and resubscribe to force reconnection
-        await channel.unsubscribe();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        channel.subscribe();
+        try {
+          // Unsubscribe and resubscribe to force reconnection
+          await channel.unsubscribe();
+          await new Promise(resolve => setTimeout(resolve, 100));
+          channel.subscribe();
+        } catch (channelError) {
+          console.warn('[NetworkStatus] Failed to reconnect channel:', channelError);
+        }
       }
       
       console.log('[NetworkStatus] Reconnected realtime channels');
+      reconnectAttemptsRef.current = 0; // Reset on success
     } catch (error) {
       console.error('[NetworkStatus] Failed to reconnect:', error);
     } finally {

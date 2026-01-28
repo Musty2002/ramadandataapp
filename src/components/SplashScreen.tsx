@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import ramadanLogo from '@/assets/ramadan-logo.jpeg';
 
 interface SplashScreenProps {
@@ -10,12 +11,29 @@ const SplashScreen = ({ onComplete, minDisplayTime = 2000 }: SplashScreenProps) 
   const [fadeOut, setFadeOut] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setFadeOut(true);
-      setTimeout(onComplete, 500); // Wait for fade animation
-    }, minDisplayTime);
+    const init = async () => {
+      // On native platforms, hide the native splash screen
+      if (Capacitor.isNativePlatform()) {
+        try {
+          const { SplashScreen: NativeSplash } = await import('@capacitor/splash-screen');
+          // Small delay to ensure smooth transition
+          await new Promise(resolve => setTimeout(resolve, 100));
+          await NativeSplash.hide();
+        } catch (error) {
+          console.warn('[SplashScreen] Failed to hide native splash:', error);
+        }
+      }
+      
+      // Wait for minimum display time then fade out
+      const timer = setTimeout(() => {
+        setFadeOut(true);
+        setTimeout(onComplete, 500); // Wait for fade animation
+      }, minDisplayTime);
 
-    return () => clearTimeout(timer);
+      return () => clearTimeout(timer);
+    };
+
+    init();
   }, [onComplete, minDisplayTime]);
 
   return (
