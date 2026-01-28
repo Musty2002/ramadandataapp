@@ -48,7 +48,8 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showPinLogin, setShowPinLogin] = useState(false);
-  const [storedUser, setStoredUser] = useState(getStoredUserForPinLogin());
+  const [storedUser, setStoredUser] = useState<ReturnType<typeof getStoredUserForPinLogin>>(null);
+  const [pinLoginChecked, setPinLoginChecked] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -65,6 +66,7 @@ export default function Auth() {
   const { 
     isAvailable: biometricAvailable, 
     isEnabled: biometricEnabled,
+    isLoading: biometricLoading2,
     hasStoredCredentials,
     getCredentials,
     setCredentials,
@@ -74,13 +76,25 @@ export default function Auth() {
   const storedCreds = hasStoredCredentials();
 
   // Check if we should show PIN login on mount
+  // Use a small delay on native to ensure localStorage is ready
   useEffect(() => {
-    const user = getStoredUserForPinLogin();
-    const pinAvailable = isPinLoginAvailable();
-    setStoredUser(user);
-    if (user && pinAvailable) {
-      setShowPinLogin(true);
-    }
+    const checkPinLogin = async () => {
+      // Small delay for native platforms to ensure storage is accessible
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      const user = getStoredUserForPinLogin();
+      const pinAvailable = isPinLoginAvailable();
+      
+      console.log('[Auth] PIN login check:', { user: !!user, pinAvailable });
+      
+      setStoredUser(user);
+      if (user && pinAvailable) {
+        setShowPinLogin(true);
+      }
+      setPinLoginChecked(true);
+    };
+    
+    checkPinLogin();
   }, []);
 
   // Refs to protect email from being wiped on problematic Android devices (e.g., Camon 20)
@@ -429,6 +443,15 @@ export default function Auth() {
   const handleSwitchToPassword = () => {
     setShowPinLogin(false);
   };
+
+  // Show loading state while checking PIN login availability
+  if (!pinLoginChecked) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
+        <div className="animate-pulse text-primary">Loading...</div>
+      </div>
+    );
+  }
 
   // Show PIN login screen for returning users
   if (showPinLogin && storedUser && isTransactionPinSetup()) {

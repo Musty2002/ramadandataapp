@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { PushNotificationProvider } from "@/components/PushNotificationProvider";
 import { NetworkStatusIndicator } from "@/components/NetworkStatus";
 import SplashScreen from "@/components/SplashScreen";
+import { useAppReady } from "@/hooks/useAppReady";
 
 // Pages
 import Auth from "./pages/Auth";
@@ -266,31 +266,23 @@ function AppRoutes() {
 }
 
 const App = () => {
-  const [showSplash, setShowSplash] = useState(true);
-  const [splashComplete, setSplashComplete] = useState(false);
+  const { showSplash, hasCheckedStorage, markReady } = useAppReady();
 
-  // Check if splash was shown this session
-  useEffect(() => {
-    const splashShown = sessionStorage.getItem('splashShown');
-    if (splashShown) {
-      setShowSplash(false);
-      setSplashComplete(true);
-    }
-  }, []);
-
-  const handleSplashComplete = () => {
-    sessionStorage.setItem('splashShown', 'true');
-    setSplashComplete(true);
-    setShowSplash(false);
-  };
+  // Don't render anything until we've checked storage
+  // This prevents flash of content before splash on native
+  if (!hasCheckedStorage) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#0a1929] via-[#0d2137] to-[#0a1929]" />
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        {showSplash && !splashComplete && (
-          <SplashScreen onComplete={handleSplashComplete} minDisplayTime={2500} />
+        {showSplash && (
+          <SplashScreen onComplete={markReady} minDisplayTime={2500} />
         )}
         <BrowserRouter>
           <AuthProvider>
