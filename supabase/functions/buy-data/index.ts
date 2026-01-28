@@ -503,11 +503,10 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
     // Step 1: Get AccessToken using POST with Basic Auth (encodedCredentials is already base64)
     console.log('Fetching Albarka AccessToken...')
     
-    const tokenResponse = await fetch('https://albarkasub.com/api/user/', {
+    const tokenResponse = await fetch('https://albarkasub.com/api/user', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${encodedCredentials}`,
-        'Content-Type': 'application/json'
+        'Authorization': `Basic ${encodedCredentials}`
       }
     })
 
