@@ -171,31 +171,34 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: resetEmail,
-        options: {
-          shouldCreateUser: false,
-        },
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ email: resetEmail }),
+        }
+      );
 
-      if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: error.message,
-        });
-      } else {
-        setResetStep('otp');
-        toast({
-          title: 'OTP Sent',
-          description: 'Check your email for the 6-digit code.',
-        });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
       }
-    } catch {
+
+      setResetStep('otp');
+      toast({
+        title: 'OTP Sent',
+        description: 'Check your email for the 6-digit code.',
+      });
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to send OTP. Please try again.',
+        description: error.message || 'Failed to send OTP. Please try again.',
       });
     } finally {
       setLoading(false);
@@ -216,30 +219,34 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
-        email: resetEmail,
-        token: otpCode,
-        type: 'email',
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ email: resetEmail, otp: otpCode }),
+        }
+      );
 
-      if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Verification Failed',
-          description: error.message,
-        });
-      } else {
-        setResetStep('newPassword');
-        toast({
-          title: 'Verified',
-          description: 'Please enter your new password.',
-        });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP code');
       }
-    } catch {
+
+      setResetStep('newPassword');
+      toast({
+        title: 'Verified',
+        description: 'Please enter your new password.',
+      });
+    } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to verify code. Please try again.',
+        title: 'Verification Failed',
+        description: error.message || 'Invalid or expired code.',
       });
     } finally {
       setLoading(false);
@@ -269,36 +276,40 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            email: resetEmail, 
+            otp: otpCode,
+            newPassword: newPassword 
+          }),
+        }
+      );
 
-      if (error) {
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: error.message,
-        });
-      } else {
-        toast({
-          title: 'Password Updated',
-          description: 'Your password has been changed successfully.',
-        });
-        // Reset state and go back to login
-        setShowForgotPassword(false);
-        setResetStep('email');
-        setResetEmail('');
-        setOtpCode('');
-        setNewPassword('');
-        setConfirmPassword('');
-        // Sign out so user can log in with new password
-        await supabase.auth.signOut();
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update password');
       }
-    } catch {
+
+      toast({
+        title: 'Password Updated',
+        description: 'Your password has been changed successfully.',
+      });
+      
+      // Reset state and go back to login
+      resetForgotPasswordFlow();
+    } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to update password. Please try again.',
+        description: error.message || 'Failed to update password. Please try again.',
       });
     } finally {
       setLoading(false);
