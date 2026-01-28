@@ -474,11 +474,11 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
 
 async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: string) {
   try {
-    const username = Deno.env.get('ALBARKA_USERNAME')
-    const password = Deno.env.get('ALBARKA_PASSWORD')
+    // ALBARKA_API_TOKEN is the pre-encoded base64(username:password)
+    const encodedCredentials = Deno.env.get('ALBARKA_API_TOKEN')
 
-    if (!username || !password) {
-      return { error: 'Albarka API credentials not configured' }
+    if (!encodedCredentials) {
+      return { error: 'Albarka API token not configured' }
     }
 
     console.log('Calling Albarka API:', { plan_id: plan.plan_id, phone: phoneNumber, network: plan.network })
@@ -500,14 +500,13 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid network for Albarka' }
     }
 
-    // Step 1: Get AccessToken using Basic Auth
-    const basicAuth = btoa(`${username}:${password}`)
+    // Step 1: Get AccessToken using Basic Auth (encodedCredentials is already base64)
     console.log('Fetching Albarka AccessToken...')
     
     const tokenResponse = await fetch('https://albarkasub.com/api/user/', {
       method: 'GET',
       headers: {
-        'Authorization': `Basic ${basicAuth}`,
+        'Authorization': `Basic ${encodedCredentials}`,
         'Content-Type': 'application/json'
       }
     })
