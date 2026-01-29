@@ -4,18 +4,19 @@ import { AccountCard } from '@/components/dashboard/AccountCard';
 import { ServicesGrid } from '@/components/dashboard/ServicesGrid';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
 import { PullToRefresh } from '@/components/ui/pull-to-refresh';
-import { Bell } from 'lucide-react';
+import { Bell, RefreshCw, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 import { WhatsAppButton } from '@/components/dashboard/WhatsAppButton';
 import { storeUserForPinLogin } from '@/components/auth/PinLoginScreen';
+import { Button } from '@/components/ui/button';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { refreshWallet, refreshProfile, profile, user } = useAuth();
+  const { refreshWallet, refreshProfile, profile, user, dataLoading, dataError, retryDataFetch } = useAuth();
   const { toast } = useToast();
   const [refreshTick, setRefreshTick] = useState(0);
   
@@ -61,6 +62,11 @@ export default function Dashboard() {
     });
   };
 
+  const handleRetry = () => {
+    retryDataFetch();
+    setRefreshTick((t) => t + 1);
+  };
+
   return (
     <MobileLayout>
       <PullToRefresh onRefresh={handleRefresh} className="h-full">
@@ -77,6 +83,33 @@ export default function Dashboard() {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
           </div>
+
+          {/* Error state with retry */}
+          {dataError && !dataLoading && (
+            <div className="mx-4 mb-4 p-4 rounded-2xl bg-destructive/10 border border-destructive/20">
+              <div className="flex items-center gap-3 mb-3">
+                <WifiOff className="w-5 h-5 text-destructive" />
+                <div className="flex-1">
+                  <p className="font-medium text-destructive">Connection Issue</p>
+                  <p className="text-sm text-muted-foreground">
+                    {dataError.includes('timed out') 
+                      ? 'Request took too long. Please check your connection.'
+                      : dataError}
+                  </p>
+                </div>
+              </div>
+              <Button 
+                onClick={handleRetry} 
+                size="sm" 
+                variant="outline"
+                className="w-full"
+                disabled={dataLoading}
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${dataLoading ? 'animate-spin' : ''}`} />
+                Try Again
+              </Button>
+            </div>
+          )}
 
           {/* Account Card */}
           <AccountCard />

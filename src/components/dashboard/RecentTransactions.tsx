@@ -1,41 +1,57 @@
-import { useEffect, useState } from 'react';
-import { ArrowUpRight, ArrowDownLeft, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { ArrowUpRight, ArrowDownLeft, ChevronRight, RefreshCw, WifiOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Transaction } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
+import { withTimeout } from '@/lib/supabaseWithTimeout';
 
 export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }) {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  const fetchTransactions = useCallback(async () => {
+    if (!user) return;
+    
+    setError(null);
+    
+    try {
+      const queryPromise = supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      const { data, error: queryError } = await withTimeout(queryPromise, 10000, 'Request timed out');
+
+      if (queryError) throw queryError;
+
+      if (data) {
+        const normalized = (data as any[]).map((row) => ({
+          ...row,
+          amount: Number(row.amount),
+        }));
+        setTransactions(normalized as Transaction[]);
+      }
+    } catch (err) {
+      console.error('[RecentTransactions] Fetch error:', err);
+      const message = err instanceof Error ? err.message : 'Failed to load transactions';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user) {
       fetchTransactions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, refreshTick]);
-
-  const fetchTransactions = async () => {
-    const { data } = await supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user!.id)
-      .order('created_at', { ascending: false })
-      .limit(5);
-
-    if (data) {
-      const normalized = (data as any[]).map((row) => ({
-        ...row,
-        amount: Number(row.amount),
-      }));
-      setTransactions(normalized as Transaction[]);
-    }
-    setLoading(false);
-  };
+  }, [user, refreshTick, fetchTransactions]);
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -65,6 +81,29 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
           {[1, 2, 3].map((i) => (
             <div key={i} className="h-16 bg-muted rounded-lg" />
           ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="px-4 pb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Recent Transactions</h3>
+        </div>
+        <div className="bg-card rounded-xl p-6 text-center">
+          <WifiOff className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground mb-3">
+            {error.includes('timed out') ? 'Slow connection' : 'Failed to load'}
+          </p>
+          <button
+            onClick={fetchTransactions}
+            className="text-sm text-primary flex items-center gap-1 mx-auto"
+          >
+            <RefreshCw className="w-3 h-3" />
+            Retry
+          </button>
         </div>
       </div>
     );

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft, RefreshCw, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
-
+import { withTimeout } from '@/lib/supabaseWithTimeout';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -52,6 +52,7 @@ export default function Data() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [plans, setPlans] = useState<DataPlan[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   
@@ -81,15 +82,19 @@ export default function Data() {
     setSelectedPlan(null);
   }, [selectedNetwork]);
 
-  const fetchPlans = async (network: string) => {
+  const fetchPlans = useCallback(async (network: string) => {
     setLoading(true);
+    setLoadError(null);
+    
     try {
-      const { data, error } = await supabase
+      const queryPromise = supabase
         .from('data_plans')
         .select('*')
         .eq('network', network)
         .eq('is_active', true)
         .order('selling_price', { ascending: true });
+
+      const { data, error } = await withTimeout(queryPromise, 12000, 'Request timed out');
 
       if (error) throw error;
 
@@ -100,15 +105,19 @@ export default function Data() {
       setCategories(uniqueCategories);
     } catch (error) {
       console.error('Error fetching plans:', error);
+      const message = error instanceof Error ? error.message : 'Failed to load data plans';
+      setLoadError(message);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to load data plans',
+        description: message.includes('timed out') 
+          ? 'Connection is slow. Please check your network.'
+          : 'Failed to load data plans',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
 
   const handleNetworkSelect = (networkId: string) => {
     setSelectedNetwork(networkId);
@@ -381,6 +390,25 @@ export default function Data() {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="w-6 h-6 animate-spin text-primary" />
                   <span className="ml-2 text-muted-foreground">Loading categories...</span>
+                </div>
+              ) : loadError ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <WifiOff className="w-8 h-8 text-destructive" />
+                  </div>
+                  <p className="text-muted-foreground mb-4">
+                    {loadError.includes('timed out') 
+                      ? 'Connection is slow. Please try again.'
+                      : 'Failed to load data plans'}
+                  </p>
+                  <Button 
+                    onClick={() => selectedNetwork && fetchPlans(selectedNetwork)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Retry
+                  </Button>
                 </div>
               ) : categories.length === 0 ? (
                 <p className="text-center text-muted-foreground py-8">
