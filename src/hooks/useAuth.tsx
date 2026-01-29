@@ -1,7 +1,8 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Profile, Wallet } from '@/types/database';
+import { withTimeout } from '@/lib/supabaseWithTimeout';
 
 interface AuthContextType {
   user: User | null;
@@ -9,14 +10,19 @@ interface AuthContextType {
   profile: Profile | null;
   wallet: Wallet | null;
   loading: boolean;
+  dataLoading: boolean;
+  dataError: string | null;
   signUp: (email: string, password: string, fullName: string, phone: string, referralCode?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
   refreshWallet: () => Promise<void>;
+  retryDataFetch: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const FETCH_TIMEOUT = 12000; // 12 seconds timeout for data fetches
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -24,35 +30,77 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
 
-  const fetchProfile = async (userId: string) => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+  const fetchProfile = useCallback(async (userId: string) => {
+    try {
+      const queryPromise = supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      
+      const { data } = await withTimeout(queryPromise, FETCH_TIMEOUT, 'Profile fetch timed out');
+      
+      if (data) {
+        setProfile(data as Profile);
+      }
+      return data;
+    } catch (error) {
+      console.error('[Auth] Profile fetch error:', error);
+      throw error;
+    }
+  }, []);
+
+  const fetchWallet = useCallback(async (userId: string) => {
+    try {
+      const queryPromise = supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const { data } = await withTimeout(queryPromise, FETCH_TIMEOUT, 'Wallet fetch timed out');
+
+      if (data) {
+        const row = data as any;
+        const parsedBalance = Number(row.balance);
+        setWallet({
+          ...(row as Wallet),
+          balance: Number.isFinite(parsedBalance) ? parsedBalance : 0,
+        });
+      }
+      return data;
+    } catch (error) {
+      console.error('[Auth] Wallet fetch error:', error);
+      throw error;
+    }
+  }, []);
+
+  const fetchUserData = useCallback(async (userId: string) => {
+    setDataLoading(true);
+    setDataError(null);
     
-    if (data) {
-      setProfile(data as Profile);
+    try {
+      await Promise.all([
+        fetchProfile(userId),
+        fetchWallet(userId),
+      ]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load data';
+      console.error('[Auth] Data fetch failed:', message);
+      setDataError(message);
+    } finally {
+      setDataLoading(false);
     }
-  };
+  }, [fetchProfile, fetchWallet]);
 
-  const fetchWallet = async (userId: string) => {
-    const { data } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (data) {
-      const row = data as any;
-      const parsedBalance = Number(row.balance);
-      setWallet({
-        ...(row as Wallet),
-        balance: Number.isFinite(parsedBalance) ? parsedBalance : 0,
-      });
+  const retryDataFetch = useCallback(() => {
+    if (user?.id) {
+      fetchUserData(user.id);
     }
-  };
+  }, [user?.id, fetchUserData]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -64,12 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Defer Supabase calls with setTimeout
         if (session?.user) {
           setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchWallet(session.user.id);
+            fetchUserData(session.user.id);
           }, 0);
         } else {
           setProfile(null);
           setWallet(null);
+          setDataError(null);
         }
         setLoading(false);
       }
@@ -80,14 +128,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchWallet(session.user.id);
+        fetchUserData(session.user.id);
       }
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchUserData]);
 
   const signUp = async (email: string, password: string, fullName: string, phone: string, referralCode?: string) => {
     const redirectUrl = `${window.location.origin}/`;
@@ -127,13 +174,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      try {
+        await fetchProfile(user.id);
+      } catch (error) {
+        console.error('[Auth] Refresh profile failed:', error);
+      }
     }
   };
 
   const refreshWallet = async () => {
     if (user) {
-      await fetchWallet(user.id);
+      try {
+        await fetchWallet(user.id);
+      } catch (error) {
+        console.error('[Auth] Refresh wallet failed:', error);
+      }
     }
   };
 
@@ -144,11 +199,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       wallet,
       loading,
+      dataLoading,
+      dataError,
       signUp,
       signIn,
       signOut,
       refreshProfile,
       refreshWallet,
+      retryDataFetch,
     }}>
       {children}
     </AuthContext.Provider>
