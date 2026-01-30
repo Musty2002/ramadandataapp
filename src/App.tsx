@@ -9,6 +9,7 @@ import { NetworkStatusIndicator } from "@/components/NetworkStatus";
 import SplashScreen from "@/components/SplashScreen";
 import { useAppReady } from "@/hooks/useAppReady";
 import { AppLockGate } from "@/components/AppLockGate";
+import { useNativeFeatures } from "@/hooks/useNativeFeatures";
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -266,6 +267,12 @@ function AppRoutes() {
   );
 }
 
+function NativeWrapper({ children }: { children: React.ReactNode }) {
+  // Initialize native features (network monitoring, keyboard handling)
+  useNativeFeatures();
+  return <>{children}</>;
+}
+
 const App = () => {
   const { showSplash, hasCheckedStorage, markReady } = useAppReady();
 
@@ -288,8 +295,10 @@ const App = () => {
         <BrowserRouter>
           <AuthProvider>
             <PushNotificationProvider>
-              <NetworkStatusIndicator />
-              <AppRoutes />
+              <NativeWrapper>
+                <NetworkStatusIndicator />
+                <AppRoutes />
+              </NativeWrapper>
             </PushNotificationProvider>
           </AuthProvider>
         </BrowserRouter>
