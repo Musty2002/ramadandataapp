@@ -15,19 +15,28 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
   const navigate = useNavigate();
 
   const fetchTransactions = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     
+    setLoading(true);
     setError(null);
     
     try {
-      const queryPromise = supabase
+      // Create fresh query each time
+      const fetchQuery = () => supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(5);
 
-      const { data, error: queryError } = await withTimeout(queryPromise, 10000, 'Request timed out');
+      const { data, error: queryError } = await withTimeout(
+        fetchQuery(),
+        8000, // 8 second timeout
+        'Connection timed out'
+      );
 
       if (queryError) throw queryError;
 
@@ -37,6 +46,7 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
           amount: Number(row.amount),
         }));
         setTransactions(normalized as Transaction[]);
+        setError(null);
       }
     } catch (err) {
       console.error('[RecentTransactions] Fetch error:', err);

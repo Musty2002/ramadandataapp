@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { AccountCard } from '@/components/dashboard/AccountCard';
 import { ServicesGrid } from '@/components/dashboard/ServicesGrid';
@@ -12,6 +12,8 @@ import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/T
 import { WhatsAppButton } from '@/components/dashboard/WhatsAppButton';
 import { storeUserForPinLogin } from '@/components/auth/PinLoginScreen';
 import { Button } from '@/components/ui/button';
+import { useConnectionTimeout } from '@/hooks/useConnectionTimeout';
+import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
 import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function Dashboard() {
@@ -22,6 +24,14 @@ export default function Dashboard() {
   
   // PIN setup states
   const [showTransactionPinSetup, setShowTransactionPinSetup] = useState(false);
+
+  // Connection timeout detection - dataLoading comes from useAuth
+  const { isTimedOut, resetTimeout } = useConnectionTimeout(dataLoading, { timeout: 15000 });
+
+  const handleTimeoutRetry = useCallback(() => {
+    resetTimeout();
+    retryDataFetch();
+  }, [resetTimeout, retryDataFetch]);
 
   // Check if transaction PIN needs to be set up on first load
   useEffect(() => {
@@ -133,6 +143,13 @@ export default function Dashboard() {
         mode="setup"
         title="Set Your PIN"
         description="Create a 4-digit PIN for quick login and transaction authorization"
+      />
+
+      {/* Connection Timeout Overlay - safety net for stuck loading */}
+      <ConnectionTimeoutOverlay
+        isVisible={isTimedOut && !dataError}
+        onRetry={handleTimeoutRetry}
+        message="Taking too long"
       />
     </MobileLayout>
   );
