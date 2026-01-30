@@ -148,6 +148,23 @@
   .safe-area-bottom {
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
+
+  .native-safe-top {
+    padding-top: max(env(safe-area-inset-top), 20px);
+  }
+
+  .native-safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 34px);
+  }
+}
+
+/* Capacitor keyboard styles - prevents layout breaking */
+.keyboard-open {
+  padding-bottom: 0 !important;
+}
+
+.keyboard-open .bottom-nav {
+  display: none !important;
 }
 
 /* Shake animation for PIN inputs */

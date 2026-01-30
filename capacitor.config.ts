@@ -42,7 +42,7 @@ const config: CapacitorConfig = {
       // Prevent Android WebView from shrinking and getting stuck at half-height
       // after keyboard dismissal on some devices.
       resize: 'none',
-      resizeOnFullScreen: true,
+      resizeOnFullScreen: false,
     },
   },
   android: {
