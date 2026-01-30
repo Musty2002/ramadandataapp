@@ -11,6 +11,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 import { withTimeout } from '@/lib/supabaseWithTimeout';
+import { useConnectionTimeout } from '@/hooks/useConnectionTimeout';
+import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -71,6 +73,9 @@ export default function Data() {
   // PIN verification state
   const [showPinDialog, setShowPinDialog] = useState(false);
 
+  // Connection timeout detection - shows overlay if stuck loading for 12s
+  const { isTimedOut, resetTimeout } = useConnectionTimeout(loading, { timeout: 12000 });
+
   useEffect(() => {
     if (selectedNetwork) {
       fetchPlans(selectedNetwork);
@@ -83,18 +88,27 @@ export default function Data() {
   }, [selectedNetwork]);
 
   const fetchPlans = useCallback(async (network: string) => {
+    // Prevent concurrent fetches
+    if (loading) return;
+    
     setLoading(true);
     setLoadError(null);
     
     try {
-      const queryPromise = supabase
+      // Create a fresh query each time
+      const fetchQuery = () => supabase
         .from('data_plans')
         .select('*')
         .eq('network', network)
         .eq('is_active', true)
         .order('selling_price', { ascending: true });
 
-      const { data, error } = await withTimeout(queryPromise, 12000, 'Request timed out');
+      // Use shorter timeout (8s) with 1 retry for better UX
+      const { data, error } = await withTimeout(
+        fetchQuery(),
+        8000,
+        'Connection timed out'
+      );
 
       if (error) throw error;
 
@@ -103,21 +117,35 @@ export default function Data() {
       
       const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
       setCategories(uniqueCategories);
+      setLoadError(null);
     } catch (error) {
       console.error('Error fetching plans:', error);
       const message = error instanceof Error ? error.message : 'Failed to load data plans';
       setLoadError(message);
+      
+      // Clear any stale data on error
+      setPlans([]);
+      setCategories([]);
+      
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: message.includes('timed out') 
-          ? 'Connection is slow. Please check your network.'
-          : 'Failed to load data plans',
+        title: 'Connection Issue',
+        description: message.includes('timed out') || message.includes('timeout')
+          ? 'Network is slow. Tap Retry to try again.'
+          : 'Could not load plans. Please try again.',
       });
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, loading]);
+
+  // Handler for timeout retry - defined after fetchPlans
+  const handleTimeoutRetry = useCallback(() => {
+    resetTimeout();
+    if (selectedNetwork) {
+      fetchPlans(selectedNetwork);
+    }
+  }, [resetTimeout, selectedNetwork, fetchPlans]);
 
   const handleNetworkSelect = (networkId: string) => {
     setSelectedNetwork(networkId);
@@ -565,6 +593,13 @@ export default function Data() {
           transaction={lastTransaction}
         />
       )}
+
+      {/* Connection Timeout Overlay - safety net for stuck loading */}
+      <ConnectionTimeoutOverlay
+        isVisible={isTimedOut}
+        onRetry={handleTimeoutRetry}
+        message="Taking too long"
+      />
     </MobileLayout>
   );
 }
