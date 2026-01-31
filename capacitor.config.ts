@@ -4,13 +4,15 @@ const config: CapacitorConfig = {
   appId: 'com.ramadandata.app',
   appName: 'Ramadan Data',
   webDir: 'dist',
-  server: {
-    // For production: comment out 'url' to load from local dist folder
-    // For development hot-reload: uncomment the url line below
-    // url: 'https://f2d268fb-d29f-46e2-885d-9cb4b456af13.lovableproject.com?forceHideBadge=true',
-    cleartext: true,
-    androidScheme: 'https'
-  },
+  // PRODUCTION MODE: Load from bundled local assets (no server URL)
+  // This ensures fast startup and offline capability
+  // 
+  // FOR DEVELOPMENT: Uncomment the server block below for hot-reload:
+  // server: {
+  //   url: 'https://f2d268fb-d29f-46e2-885d-9cb4b456af13.lovableproject.com?forceHideBadge=true',
+  //   cleartext: true,
+  //   androidScheme: 'https'
+  // },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2500,
@@ -39,8 +41,6 @@ const config: CapacitorConfig = {
       sound: 'default',
     },
     Keyboard: {
-      // Prevent Android WebView from shrinking and getting stuck at half-height
-      // after keyboard dismissal on some devices.
       resize: 'none',
       resizeOnFullScreen: false,
     },
@@ -48,8 +48,7 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: true,
-    // Ensure app handles all navigation internally
+    webContentsDebuggingEnabled: false, // Disable for production
     initialFocus: true,
   },
   ios: {
