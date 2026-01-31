@@ -34,6 +34,7 @@ const signInSchema = z.object({
 });
 
 type ResetStep = 'email' | 'otp' | 'newPassword';
+type OtpType = 'recovery'; // Supabase OTP type for password reset
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -185,22 +186,13 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-password-otp`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ email: resetEmail }),
-        }
-      );
+      // Use Supabase's built-in password reset with email OTP
+      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+        redirectTo: `${window.location.origin}/auth`,
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send OTP');
+      if (error) {
+        throw error;
       }
 
       setResetStep('otp');
@@ -233,22 +225,15 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ email: resetEmail, otp: otpCode }),
-        }
-      );
+      // Verify OTP using Supabase's built-in method
+      const { error } = await supabase.auth.verifyOtp({
+        email: resetEmail,
+        token: otpCode,
+        type: 'recovery',
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Invalid OTP code');
+      if (error) {
+        throw error;
       }
 
       setResetStep('newPassword');
@@ -290,31 +275,21 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({ 
-            email: resetEmail, 
-            otp: otpCode,
-            newPassword: newPassword 
-          }),
-        }
-      );
+      // Update password using Supabase's built-in method (user is already authenticated after OTP verification)
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update password');
+      if (error) {
+        throw error;
       }
+
+      // Sign out after password change so user logs in with new password
+      await supabase.auth.signOut();
 
       toast({
         title: 'Password Updated',
-        description: 'Your password has been changed successfully.',
+        description: 'Your password has been changed successfully. Please log in.',
       });
       
       // Reset state and go back to login
