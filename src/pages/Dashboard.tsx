@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { useConnectionTimeout } from '@/hooks/useConnectionTimeout';
 import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
 import logo from '@/assets/ramadan-logo.jpeg';
+import { useDocumentVisibility } from '@/hooks/useDocumentVisibility';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -25,8 +26,13 @@ export default function Dashboard() {
   // PIN setup states
   const [showTransactionPinSetup, setShowTransactionPinSetup] = useState(false);
 
+  const { isVisible } = useDocumentVisibility();
+
   // Connection timeout detection - dataLoading comes from useAuth
-  const { isTimedOut, resetTimeout } = useConnectionTimeout(dataLoading, { timeout: 15000 });
+  const { isTimedOut, resetTimeout } = useConnectionTimeout(dataLoading, {
+    timeout: 15000,
+    enabled: isVisible,
+  });
 
   const handleTimeoutRetry = useCallback(() => {
     resetTimeout();

@@ -7,6 +7,30 @@ import { Transaction, TransactionCategory } from '@/types/database';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 
+function cacheKey(userId: string) {
+  return `history_transactions_v1:${userId}`;
+}
+
+function readCache(userId: string): Transaction[] {
+  try {
+    const raw = localStorage.getItem(cacheKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Transaction[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCache(userId: string, txs: Transaction[]) {
+  try {
+    // keep the cache bounded
+    localStorage.setItem(cacheKey(userId), JSON.stringify(txs.slice(0, 200)));
+  } catch {
+    // ignore
+  }
+}
+
 const categoryFilters: { label: string; value: TransactionCategory | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Data', value: 'data' },
@@ -23,9 +47,20 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TransactionCategory | 'all'>('all');
 
+  // Hydrate from cache to prevent empty/skeleton UI after background reload
+  useEffect(() => {
+    if (!user?.id) return;
+    const cached = readCache(user.id);
+    if (cached.length) {
+      setTransactions(cached);
+      setLoading(false);
+    }
+  }, [user?.id]);
+
   const fetchTransactions = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    const hasExisting = transactions.length > 0;
+    if (!hasExisting) setLoading(true);
     let query = supabase
       .from('transactions')
       .select('*')
@@ -36,16 +71,25 @@ export default function History() {
       query = query.eq('category', filter);
     }
 
-    const { data } = await query;
-    if (data) {
-      const normalized = (data as any[]).map((row) => ({
-        ...row,
-        amount: Number(row.amount),
-      }));
-      setTransactions(normalized as Transaction[]);
+    try {
+      const { data, error } = await query;
+      if (error) throw error;
+      if (data) {
+        const normalized = (data as any[]).map((row) => ({
+          ...row,
+          amount: Number(row.amount),
+        }));
+        const next = normalized as Transaction[];
+        setTransactions(next);
+        writeCache(user.id, next);
+      }
+    } catch (err) {
+      // Keep existing transactions if we fail to refresh (offline/resume).
+      console.error('[History] Fetch error:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [user, filter]);
+  }, [user, filter, transactions.length]);
 
   useEffect(() => {
     fetchTransactions();
