@@ -47,21 +47,22 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 
 
-// Configure QueryClient with network-resilient defaults
-// This handles retries, caching, and refetch on reconnect automatically
+// Configure QueryClient with offline-first caching
+// Aggressive caching for mobile app performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
-      gcTime: 1000 * 60 * 30, // 30 minutes (previously cacheTime)
+      staleTime: 1000 * 60 * 10, // 10 minutes - data stays fresh longer
+      gcTime: 1000 * 60 * 60 * 24, // 24 hours - keep in cache for a full day
       retry: 3,
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-      refetchOnWindowFocus: true,
-      refetchOnReconnect: true, // Auto-refetch when coming back online
-      networkMode: 'online', // Only fetch when online
+      refetchOnWindowFocus: false, // Don't refetch on every focus (mobile)
+      refetchOnReconnect: true, // Refetch when coming back online
+      refetchOnMount: false, // Use cached data on mount
+      networkMode: 'offlineFirst', // Use cache first, fetch in background
     },
     mutations: {
-      retry: 2,
+      retry: 3,
       retryDelay: 1000,
       networkMode: 'online',
     },
