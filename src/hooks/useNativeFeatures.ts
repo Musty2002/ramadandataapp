@@ -1,82 +1,19 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Network } from '@capacitor/network';
 import { Keyboard } from '@capacitor/keyboard';
-import { toast } from 'sonner';
 
-interface NetworkStatus {
-  connected: boolean;
-  connectionType: string | null;
-}
-
+/**
+ * Simplified native features hook - handles keyboard only.
+ * Network resilience is handled by TanStack Query's built-in features
+ * (retry, refetch on reconnect, caching).
+ */
 export function useNativeFeatures() {
-  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>({
-    connected: true,
-    connectionType: null,
-  });
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-
-  const checkConnection = useCallback(async () => {
-    if (!Capacitor.isNativePlatform()) return true;
-    
-    try {
-      const status = await Network.getStatus();
-      setNetworkStatus({
-        connected: status.connected,
-        connectionType: status.connectionType,
-      });
-      return status.connected;
-    } catch {
-      return true; // Assume connected if we can't check
-    }
-  }, []);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
-    const initNative = async () => {
-      // Get initial network status
-      try {
-        const status = await Network.getStatus();
-        setNetworkStatus({
-          connected: status.connected,
-          connectionType: status.connectionType,
-        });
-
-        if (!status.connected) {
-          toast.error('No internet connection', {
-            id: 'network-offline',
-            duration: Infinity,
-          });
-        }
-      } catch (error) {
-        console.warn('[NativeFeatures] Failed to get network status:', error);
-      }
-
-      // Listen for network changes
-      try {
-        Network.addListener('networkStatusChange', (status) => {
-          console.log('[NativeFeatures] Network status changed:', status);
-          setNetworkStatus({
-            connected: status.connected,
-            connectionType: status.connectionType,
-          });
-
-          if (!status.connected) {
-            toast.error('No internet connection', {
-              id: 'network-offline',
-              duration: Infinity,
-            });
-          } else {
-            toast.dismiss('network-offline');
-            toast.success('Back online', { duration: 2000 });
-          }
-        });
-      } catch (error) {
-        console.warn('[NativeFeatures] Failed to add network listener:', error);
-      }
-
-      // Keyboard listeners
+    const initKeyboard = async () => {
       try {
         Keyboard.addListener('keyboardWillShow', () => {
           setIsKeyboardOpen(true);
@@ -102,11 +39,10 @@ export function useNativeFeatures() {
       }
     };
 
-    initNative();
+    initKeyboard();
 
     return () => {
       try {
-        Network.removeAllListeners();
         Keyboard.removeAllListeners();
       } catch {
         // Ignore cleanup errors
@@ -115,9 +51,6 @@ export function useNativeFeatures() {
   }, []);
 
   return {
-    networkStatus,
-    isOnline: networkStatus.connected,
     isKeyboardOpen,
-    checkConnection,
   };
 }
