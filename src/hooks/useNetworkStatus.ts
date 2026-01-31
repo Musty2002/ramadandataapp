@@ -17,15 +17,17 @@ export function useNetworkStatus() {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const lastOnlineRef = useRef(navigator.onLine);
   const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 3;
+  const maxReconnectAttempts = 5;
+  const reconnectDelayRef = useRef(500);
 
   const reconnectRealtime = useCallback(async () => {
     if (isReconnecting) return;
     
-    // Limit reconnection attempts
+    // Limit reconnection attempts with exponential backoff
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-      console.log('[NetworkStatus] Max reconnect attempts reached, waiting for next trigger');
+      console.log('[NetworkStatus] Max reconnect attempts reached, resetting');
       reconnectAttemptsRef.current = 0;
+      reconnectDelayRef.current = 500;
       return;
     }
     
@@ -33,14 +35,21 @@ export function useNetworkStatus() {
     reconnectAttemptsRef.current++;
     
     try {
+      // First, try to refresh the auth session
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.warn('[NetworkStatus] Session refresh failed:', refreshError.message);
+      }
+
       // Get all active channels and reconnect them
       const channels = supabase.getChannels();
+      console.log('[NetworkStatus] Reconnecting', channels.length, 'channels');
       
       for (const channel of channels) {
         try {
           // Unsubscribe and resubscribe to force reconnection
           await channel.unsubscribe();
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 50));
           channel.subscribe();
         } catch (channelError) {
           console.warn('[NetworkStatus] Failed to reconnect channel:', channelError);
@@ -48,9 +57,12 @@ export function useNetworkStatus() {
       }
       
       console.log('[NetworkStatus] Reconnected realtime channels');
-      reconnectAttemptsRef.current = 0; // Reset on success
+      reconnectAttemptsRef.current = 0;
+      reconnectDelayRef.current = 500;
     } catch (error) {
       console.error('[NetworkStatus] Failed to reconnect:', error);
+      // Exponential backoff
+      reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 10000);
     } finally {
       setIsReconnecting(false);
     }
@@ -70,7 +82,7 @@ export function useNetworkStatus() {
       // Delay reconnection slightly to ensure network is stable
       reconnectTimeoutRef.current = window.setTimeout(() => {
         reconnectRealtime();
-      }, 1000);
+      }, reconnectDelayRef.current);
     }
     
     lastOnlineRef.current = true;
@@ -117,7 +129,7 @@ export function useNetworkStatus() {
           // Delay reconnection slightly
           reconnectTimeoutRef.current = window.setTimeout(() => {
             reconnectRealtime();
-          }, 1000);
+          }, reconnectDelayRef.current);
         }
 
         lastOnlineRef.current = networkStatus.connected;

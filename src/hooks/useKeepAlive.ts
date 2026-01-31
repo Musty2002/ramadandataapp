@@ -1,89 +1,184 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
+import { Network } from '@capacitor/network';
 import { supabase } from '@/integrations/supabase/client';
 
 interface KeepAliveOptions {
-  /** Interval in milliseconds for background pings (default: 30 seconds) */
+  /** Interval in milliseconds for keep-alive pings (default: 20 seconds) */
   interval?: number;
-  /** Whether to enable keep-alive (default: true on native platforms) */
+  /** Whether to enable keep-alive (default: true) */
   enabled?: boolean;
 }
 
 /**
- * Hook to keep the Supabase connection alive by periodically pinging the backend.
- * This prevents connection issues when the app is in the background or idle.
+ * Robust hook to keep the Supabase connection alive.
+ * - Pings backend periodically
+ * - Handles network state changes aggressively
+ * - Reconnects realtime channels on recovery
+ * - Refreshes auth session proactively
  */
 export function useKeepAlive(options: KeepAliveOptions = {}) {
-  const { interval = 30000, enabled = Capacitor.isNativePlatform() } = options;
+  const { interval = 20000, enabled = true } = options;
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isActiveRef = useRef(true);
+  const lastPingRef = useRef<number>(Date.now());
+  const failedPingsRef = useRef(0);
+  const maxFailedPings = 3;
+
+  const reconnectChannels = useCallback(async () => {
+    try {
+      const channels = supabase.getChannels();
+      console.log('[KeepAlive] Reconnecting', channels.length, 'channels');
+      
+      for (const channel of channels) {
+        try {
+          await channel.unsubscribe();
+          await new Promise(resolve => setTimeout(resolve, 50));
+          channel.subscribe();
+        } catch (e) {
+          console.warn('[KeepAlive] Channel reconnect failed:', e);
+        }
+      }
+    } catch (error) {
+      console.warn('[KeepAlive] Failed to reconnect channels:', error);
+    }
+  }, []);
+
+  const refreshSession = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.warn('[KeepAlive] Session refresh failed:', error.message);
+      } else if (data.session) {
+        console.log('[KeepAlive] Session refreshed');
+      }
+    } catch (error) {
+      console.warn('[KeepAlive] Session refresh error:', error);
+    }
+  }, []);
+
+  const ping = useCallback(async (isRecovery = false) => {
+    if (!isActiveRef.current) return;
+
+    const now = Date.now();
+    const timeSinceLastPing = now - lastPingRef.current;
+
+    try {
+      // Simple lightweight query to keep connection alive
+      const { error } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      lastPingRef.current = now;
+      failedPingsRef.current = 0;
+
+      // If this is a recovery ping or we've been away for too long, refresh everything
+      if (isRecovery || timeSinceLastPing > 60000) {
+        console.log('[KeepAlive] Recovery mode - refreshing session and channels');
+        await refreshSession();
+        await reconnectChannels();
+      }
+    } catch (error) {
+      console.warn('[KeepAlive] Ping failed:', error);
+      failedPingsRef.current++;
+
+      // After multiple failures, try aggressive recovery
+      if (failedPingsRef.current >= maxFailedPings) {
+        console.log('[KeepAlive] Multiple ping failures, attempting full recovery');
+        failedPingsRef.current = 0;
+        await refreshSession();
+        await reconnectChannels();
+      }
+    }
+  }, [refreshSession, reconnectChannels]);
+
+  const startKeepAlive = useCallback(() => {
+    if (intervalRef.current) return;
+
+    console.log('[KeepAlive] Starting with interval:', interval);
+    intervalRef.current = setInterval(() => ping(false), interval);
+  }, [interval, ping]);
+
+  const stopKeepAlive = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+      console.log('[KeepAlive] Stopped');
+    }
+  }, []);
+
+  const handleResume = useCallback(() => {
+    console.log('[KeepAlive] App resumed - triggering recovery');
+    isActiveRef.current = true;
+
+    // Immediate recovery ping
+    ping(true);
+
+    // Restart periodic pings
+    startKeepAlive();
+  }, [ping, startKeepAlive]);
+
+  const handlePause = useCallback(() => {
+    console.log('[KeepAlive] App paused');
+    isActiveRef.current = false;
+    stopKeepAlive();
+  }, [stopKeepAlive]);
 
   useEffect(() => {
     if (!enabled) return;
 
-    const ping = async () => {
-      if (!isActiveRef.current) return;
-      
-      try {
-        // Simple lightweight query to keep connection alive
-        await supabase.from('profiles').select('id').limit(1).maybeSingle();
-      } catch (error) {
-        console.warn('[KeepAlive] Ping failed:', error);
-      }
-    };
-
-    const startKeepAlive = () => {
-      if (intervalRef.current) return;
-      
-      // Initial ping
-      ping();
-      
-      // Set up periodic pings
-      intervalRef.current = setInterval(ping, interval);
-      console.log('[KeepAlive] Started with interval:', interval);
-    };
-
-    const stopKeepAlive = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-        console.log('[KeepAlive] Stopped');
-      }
-    };
-
-    // Start immediately
+    // Initial ping and start
+    ping(false);
     startKeepAlive();
 
-    // Handle app state changes on native platforms
-    let resumeHandle: Promise<import('@capacitor/core').PluginListenerHandle> | null = null;
-    let pauseHandle: Promise<import('@capacitor/core').PluginListenerHandle> | null = null;
+    const handles: Promise<import('@capacitor/core').PluginListenerHandle>[] = [];
 
     if (Capacitor.isNativePlatform()) {
+      // App lifecycle
       try {
-        resumeHandle = App.addListener('resume', () => {
-          console.log('[KeepAlive] App resumed, restarting keep-alive');
-          isActiveRef.current = true;
-          // Immediate ping on resume to refresh connection
-          ping();
-          startKeepAlive();
-        });
+        handles.push(
+          App.addListener('resume', handleResume),
+          App.addListener('pause', handlePause)
+        );
+      } catch (e) {
+        console.warn('[KeepAlive] Failed to add app listeners:', e);
+      }
 
-        pauseHandle = App.addListener('pause', () => {
-          console.log('[KeepAlive] App paused, stopping keep-alive');
-          isActiveRef.current = false;
-          stopKeepAlive();
-        });
-      } catch (error) {
-        console.warn('[KeepAlive] Failed to add app state listeners:', error);
+      // Network state changes
+      try {
+        handles.push(
+          Network.addListener('networkStatusChange', (status) => {
+            console.log('[KeepAlive] Network changed:', status);
+            if (status.connected) {
+              // Network came back - recovery mode
+              isActiveRef.current = true;
+              ping(true);
+              startKeepAlive();
+            } else {
+              // Network lost
+              isActiveRef.current = false;
+              stopKeepAlive();
+            }
+          })
+        );
+      } catch (e) {
+        console.warn('[KeepAlive] Failed to add network listener:', e);
       }
     }
 
-    // Also listen for visibility changes (works on web and some native scenarios)
+    // Visibility change (works on web and native)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        console.log('[KeepAlive] Visibility restored');
         isActiveRef.current = true;
-        ping();
+        ping(true);
         startKeepAlive();
       } else {
         isActiveRef.current = false;
@@ -91,18 +186,40 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
       }
     };
 
+    // Focus/blur for additional coverage
+    const handleFocus = () => {
+      console.log('[KeepAlive] Window focused');
+      isActiveRef.current = true;
+      ping(true);
+      startKeepAlive();
+    };
+
+    const handleOnline = () => {
+      console.log('[KeepAlive] Browser online');
+      isActiveRef.current = true;
+      ping(true);
+      startKeepAlive();
+    };
+
+    const handleOffline = () => {
+      console.log('[KeepAlive] Browser offline');
+      isActiveRef.current = false;
+      stopKeepAlive();
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
 
     return () => {
       stopKeepAlive();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      
-      if (resumeHandle) {
-        resumeHandle.then(h => h.remove()).catch(() => {});
-      }
-      if (pauseHandle) {
-        pauseHandle.then(h => h.remove()).catch(() => {});
-      }
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+
+      handles.forEach((p) => p.then((h) => h.remove()).catch(() => {}));
     };
-  }, [enabled, interval]);
+  }, [enabled, ping, startKeepAlive, stopKeepAlive, handleResume, handlePause]);
 }
