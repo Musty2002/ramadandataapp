@@ -33,7 +33,7 @@ const signInSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-type ResetStep = 'email' | 'newPassword';
+type ResetStep = 'email' | 'otp' | 'newPassword';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -43,7 +43,7 @@ export default function Auth() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [resetStep, setResetStep] = useState<ResetStep>('email');
-  const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -171,28 +171,7 @@ export default function Auth() {
     }
   };
 
-  // Check for password recovery redirect on mount
-  useEffect(() => {
-    const checkRecoverySession = async () => {
-      // Check URL hash for recovery tokens (from magic link redirect)
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      const type = hashParams.get('type');
-      
-      if (type === 'recovery' && accessToken) {
-        // User clicked the recovery link - show password reset form
-        setShowForgotPassword(true);
-        setResetStep('newPassword');
-        
-        // Clean up URL
-        window.history.replaceState(null, '', window.location.pathname);
-      }
-    };
-    
-    checkRecoverySession();
-  }, []);
-
-  const handleSendResetEmail = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!resetEmail) {
@@ -206,24 +185,82 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
-        redirectTo: `${window.location.origin}/auth`,
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ email: resetEmail }),
+        }
+      );
 
-      if (error) {
-        throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP');
       }
 
-      setResetEmailSent(true);
+      setResetStep('otp');
       toast({
-        title: 'Email Sent',
-        description: 'Check your email for the password reset link.',
+        title: 'OTP Sent',
+        description: 'Check your email for the 6-digit code.',
       });
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: error.message || 'Failed to send reset email. Please try again.',
+        description: error.message || 'Failed to send OTP. Please try again.',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!otpCode || otpCode.length !== 6) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Code',
+        description: 'Please enter the 6-digit code from your email.',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ email: resetEmail, otp: otpCode }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Invalid OTP code');
+      }
+
+      setResetStep('newPassword');
+      toast({
+        title: 'Verified',
+        description: 'Please enter your new password.',
+      });
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Verification Failed',
+        description: error.message || 'Invalid or expired code.',
       });
     } finally {
       setLoading(false);
@@ -253,21 +290,31 @@ export default function Auth() {
 
     setLoading(true);
     try {
-      // Update password using Supabase's built-in method (user is already authenticated after OTP verification)
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-password-otp`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            email: resetEmail, 
+            otp: otpCode,
+            newPassword: newPassword 
+          }),
+        }
+      );
 
-      if (error) {
-        throw error;
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update password');
       }
-
-      // Sign out after password change so user logs in with new password
-      await supabase.auth.signOut();
 
       toast({
         title: 'Password Updated',
-        description: 'Your password has been changed successfully. Please log in.',
+        description: 'Your password has been changed successfully.',
       });
       
       // Reset state and go back to login
@@ -287,7 +334,7 @@ export default function Auth() {
     setShowForgotPassword(false);
     setResetStep('email');
     setResetEmail('');
-    setResetEmailSent(false);
+    setOtpCode('');
     setNewPassword('');
     setConfirmPassword('');
   };
@@ -424,15 +471,15 @@ export default function Auth() {
           <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
           <h1 className="text-2xl font-bold text-primary">Reset Password</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {resetStep === 'email' && !resetEmailSent && 'Enter your email to receive a reset link'}
-            {resetStep === 'email' && resetEmailSent && 'Check your email for the reset link'}
+            {resetStep === 'email' && 'Enter your email to receive a code'}
+            {resetStep === 'otp' && 'Enter the 6-digit code sent to your email'}
             {resetStep === 'newPassword' && 'Create your new password'}
           </p>
         </div>
 
         <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg p-6">
-          {resetStep === 'email' && !resetEmailSent && (
-            <form onSubmit={handleSendResetEmail} className="space-y-4">
+          {resetStep === 'email' && (
+            <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
                 <Label htmlFor="resetEmail">Email Address</Label>
                 <Input
@@ -449,7 +496,7 @@ export default function Auth() {
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Sending...' : 'Send Reset Link'}
+                {loading ? 'Sending...' : 'Send OTP Code'}
               </Button>
 
               <Button
@@ -463,8 +510,8 @@ export default function Auth() {
             </form>
           )}
 
-          {resetStep === 'email' && resetEmailSent && (
-            <div className="space-y-4">
+          {resetStep === 'otp' && (
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
               <div className="text-center mb-4">
                 <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3">
                   <svg className="w-8 h-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -472,41 +519,51 @@ export default function Auth() {
                   </svg>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  We've sent a password reset link to <strong>{resetEmail}</strong>
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Click the link in your email to reset your password.
+                  We've sent a 6-digit code to <strong>{resetEmail}</strong>
                 </p>
               </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => setResetEmailSent(false)}
-              >
-                Try Different Email
+              <div>
+                <Label htmlFor="otpCode">Enter Code</Label>
+                <Input
+                  id="otpCode"
+                  type="text"
+                  placeholder="000000"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                  className="mt-2 text-center text-2xl tracking-widest font-mono"
+                />
+              </div>
+
+              <Button type="submit" className="w-full" disabled={loading || otpCode.length !== 6}>
+                {loading ? 'Verifying...' : 'Verify Code'}
               </Button>
 
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={handleSendResetEmail}
-                disabled={loading}
-              >
-                {loading ? 'Sending...' : 'Resend Link'}
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                onClick={resetForgotPasswordFlow}
-              >
-                Back to Login
-              </Button>
-            </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setResetStep('email');
+                    setOtpCode('');
+                  }}
+                >
+                  Change Email
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex-1"
+                  onClick={handleSendOtp}
+                  disabled={loading}
+                >
+                  Resend Code
+                </Button>
+              </div>
+            </form>
           )}
 
           {resetStep === 'newPassword' && (
