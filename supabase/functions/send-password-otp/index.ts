@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -67,55 +66,65 @@ serve(async (req) => {
 
     console.log(`OTP generated for ${email}, expires at ${expiresAt.toISOString()}`);
 
-    // Send OTP email using Resend
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    // Send OTP email using Brevo
+    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
+    if (!brevoApiKey) {
+      console.error("BREVO_API_KEY not configured");
       throw new Error("Email service not configured");
     }
 
-    const resend = new Resend(resendApiKey);
-
-    const { error: emailError } = await resend.emails.send({
-      from: "Ramadan Data <onboarding@resend.dev>",
-      to: [email],
-      subject: "Password Reset Code - Ramadan Data",
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0;">
-          <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-            <h1 style="color: #18181b; font-size: 24px; font-weight: 600; text-align: center; margin: 0 0 8px 0;">Password Reset</h1>
-            <p style="color: #71717a; font-size: 14px; text-align: center; margin: 0 0 32px 0;">Ramadan Data App</p>
-            
-            <p style="color: #3f3f46; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
-              You requested to reset your password. Use the code below to complete the process:
-            </p>
-            
-            <div style="background-color: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
-              <span style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #18181b;">${otpCode}</span>
+    const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "api-key": brevoApiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "Ramadan Data",
+          email: "noreply@ramadandataapp.com.ng",
+        },
+        to: [{ email: email }],
+        subject: "Password Reset Code - Ramadan Data",
+        htmlContent: `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          </head>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; padding: 40px 20px; margin: 0;">
+            <div style="max-width: 400px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+              <h1 style="color: #18181b; font-size: 24px; font-weight: 600; text-align: center; margin: 0 0 8px 0;">Password Reset</h1>
+              <p style="color: #71717a; font-size: 14px; text-align: center; margin: 0 0 32px 0;">Ramadan Data App</p>
+              
+              <p style="color: #3f3f46; font-size: 14px; line-height: 1.6; margin: 0 0 24px 0;">
+                You requested to reset your password. Use the code below to complete the process:
+              </p>
+              
+              <div style="background-color: #f4f4f5; border-radius: 8px; padding: 20px; text-align: center; margin: 0 0 24px 0;">
+                <span style="font-family: 'Courier New', monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #18181b;">${otpCode}</span>
+              </div>
+              
+              <p style="color: #71717a; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
+                This code expires in <strong>10 minutes</strong>.
+              </p>
+              
+              <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 24px 0 0 0;">
+                If you didn't request this, you can safely ignore this email.
+              </p>
             </div>
-            
-            <p style="color: #71717a; font-size: 12px; text-align: center; margin: 0 0 8px 0;">
-              This code expires in <strong>10 minutes</strong>.
-            </p>
-            
-            <p style="color: #a1a1aa; font-size: 12px; text-align: center; margin: 24px 0 0 0;">
-              If you didn't request this, you can safely ignore this email.
-            </p>
-          </div>
-        </body>
-        </html>
-      `,
+          </body>
+          </html>
+        `,
+      }),
     });
 
-    if (emailError) {
-      console.error("Error sending email via Resend:", emailError);
+    if (!emailResponse.ok) {
+      const errorData = await emailResponse.json();
+      console.error("Error sending email via Brevo:", errorData);
       throw new Error("Failed to send reset code email");
     }
 
