@@ -4,6 +4,32 @@ import { supabase } from '@/integrations/supabase/client';
 import { Profile, Wallet } from '@/types/database';
 import { withTimeout } from '@/lib/supabaseWithTimeout';
 
+const AUTH_CACHE_KEY = 'auth_cache_v1';
+
+type AuthCache = {
+  profile: Profile | null;
+  wallet: Wallet | null;
+  cachedAt: string;
+};
+
+function readAuthCache(): AuthCache | null {
+  try {
+    const raw = localStorage.getItem(AUTH_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as AuthCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeAuthCache(next: AuthCache) {
+  try {
+    localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -33,6 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
+  // Hydrate from local cache ASAP so the UI stays stable after Android background reloads
+  useEffect(() => {
+    const cached = readAuthCache();
+    if (cached?.profile) setProfile(cached.profile);
+    if (cached?.wallet) setWallet(cached.wallet);
+  }, []);
+
   const fetchProfile = useCallback(async (userId: string) => {
     try {
       const queryPromise = supabase
@@ -44,14 +77,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data } = await withTimeout(queryPromise, FETCH_TIMEOUT, 'Profile fetch timed out');
       
       if (data) {
-        setProfile(data as Profile);
+        const nextProfile = data as Profile;
+        setProfile(nextProfile);
+        writeAuthCache({
+          profile: nextProfile,
+          wallet,
+          cachedAt: new Date().toISOString(),
+        });
       }
       return data;
     } catch (error) {
       console.error('[Auth] Profile fetch error:', error);
       throw error;
     }
-  }, []);
+  }, [wallet]);
 
   const fetchWallet = useCallback(async (userId: string) => {
     try {
@@ -66,9 +105,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         const row = data as any;
         const parsedBalance = Number(row.balance);
-        setWallet({
+        const nextWallet: Wallet = {
           ...(row as Wallet),
           balance: Number.isFinite(parsedBalance) ? parsedBalance : 0,
+        };
+        setWallet(nextWallet);
+        writeAuthCache({
+          profile,
+          wallet: nextWallet,
+          cachedAt: new Date().toISOString(),
         });
       }
       return data;
@@ -76,11 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('[Auth] Wallet fetch error:', error);
       throw error;
     }
-  }, []);
+  }, [profile]);
 
   const fetchUserData = useCallback(async (userId: string) => {
-    setDataLoading(true);
-    setDataError(null);
+    // If we already have cached data, refresh silently in the background.
+    // This prevents “connection failed” UI taking over when resuming offline.
+    const hasCachedData = !!profile || !!wallet;
+    setDataLoading(!hasCachedData);
+    if (!hasCachedData) setDataError(null);
     
     try {
       await Promise.all([
@@ -90,11 +138,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load data';
       console.error('[Auth] Data fetch failed:', message);
-      setDataError(message);
+      if (!hasCachedData) {
+        setDataError(message);
+      }
     } finally {
       setDataLoading(false);
     }
-  }, [fetchProfile, fetchWallet]);
+  }, [fetchProfile, fetchWallet, profile, wallet]);
 
   const retryDataFetch = useCallback(() => {
     if (user?.id) {
@@ -170,6 +220,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setWallet(null);
+    try {
+      localStorage.removeItem(AUTH_CACHE_KEY);
+    } catch {
+      // ignore
+    }
   };
 
   const refreshProfile = async () => {

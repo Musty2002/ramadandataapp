@@ -7,6 +7,29 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { withTimeout } from '@/lib/supabaseWithTimeout';
 
+function cacheKey(userId: string) {
+  return `recent_transactions_v1:${userId}`;
+}
+
+function readCache(userId: string): Transaction[] {
+  try {
+    const raw = localStorage.getItem(cacheKey(userId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Transaction[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeCache(userId: string, txs: Transaction[]) {
+  try {
+    localStorage.setItem(cacheKey(userId), JSON.stringify(txs));
+  } catch {
+    // ignore
+  }
+}
+
 export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }) {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -14,13 +37,27 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  const userId = user?.id;
+
+  // Hydrate from cache so the UI stays stable after background WebView reloads
+  useEffect(() => {
+    if (!userId) return;
+    const cached = readCache(userId);
+    if (cached.length) {
+      setTransactions(cached);
+      setLoading(false);
+      setError(null);
+    }
+  }, [userId]);
+
   const fetchTransactions = useCallback(async () => {
-    if (!user) {
+    if (!userId) {
       setLoading(false);
       return;
     }
     
-    setLoading(true);
+    const hasExisting = transactions.length > 0;
+    if (!hasExisting) setLoading(true);
     setError(null);
     
     try {
@@ -28,7 +65,7 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
       const fetchQuery = () => supabase
         .from('transactions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -45,23 +82,28 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
           ...row,
           amount: Number(row.amount),
         }));
-        setTransactions(normalized as Transaction[]);
+        const next = normalized as Transaction[];
+        setTransactions(next);
+        writeCache(userId, next);
         setError(null);
       }
     } catch (err) {
       console.error('[RecentTransactions] Fetch error:', err);
       const message = err instanceof Error ? err.message : 'Failed to load transactions';
-      setError(message);
+      // If we already have cached transactions, keep showing them.
+      if (transactions.length === 0) {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userId, transactions.length]);
 
   useEffect(() => {
-    if (user) {
+    if (userId) {
       fetchTransactions();
     }
-  }, [user, refreshTick, fetchTransactions]);
+  }, [userId, refreshTick, fetchTransactions]);
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
@@ -96,7 +138,7 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
     );
   }
 
-  if (error) {
+  if (error && transactions.length === 0) {
     return (
       <div className="px-4 pb-6">
         <div className="flex items-center justify-between mb-4">
