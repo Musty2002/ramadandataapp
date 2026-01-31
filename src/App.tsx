@@ -10,6 +10,7 @@ import SplashScreen from "@/components/SplashScreen";
 import { useAppReady } from "@/hooks/useAppReady";
 import { AppLockGate } from "@/components/AppLockGate";
 import { useNativeFeatures } from "@/hooks/useNativeFeatures";
+import { useKeepAlive } from "@/hooks/useKeepAlive";
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -270,6 +271,10 @@ function AppRoutes() {
 function NativeWrapper({ children }: { children: React.ReactNode }) {
   // Initialize native features (network monitoring, keyboard handling)
   useNativeFeatures();
+  
+  // Keep Supabase connection alive to prevent timeout issues
+  useKeepAlive({ interval: 30000 });
+  
   return <>{children}</>;
 }
 
