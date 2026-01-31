@@ -24,9 +24,35 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
   const isActiveRef = useRef(true);
   const lastPingRef = useRef<number>(Date.now());
   const pingInFlightRef = useRef(false);
+  const pingStartedAtRef = useRef<number>(0);
+  const pingAbortControllerRef = useRef<AbortController | null>(null);
+  const pingAbortTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const recoveryInFlightRef = useRef(false);
   const failedPingsRef = useRef(0);
   const maxFailedPings = 3;
+
+  const clearInFlightPing = useCallback(() => {
+    if (pingAbortTimeoutRef.current) {
+      clearTimeout(pingAbortTimeoutRef.current);
+      pingAbortTimeoutRef.current = null;
+    }
+    pingAbortControllerRef.current = null;
+    pingInFlightRef.current = false;
+    pingStartedAtRef.current = 0;
+  }, []);
+
+  const abortInFlightPing = useCallback(() => {
+    // On mobile, JS timers/fetch can freeze while backgrounded.
+    // If a ping is mid-flight when that happens, our `finally` may never run,
+    // leaving `pingInFlightRef=true` forever. We must actively abort/reset.
+    try {
+      pingAbortControllerRef.current?.abort();
+    } catch {
+      // ignore
+    } finally {
+      clearInFlightPing();
+    }
+  }, [clearInFlightPing]);
 
   const reconnectChannels = useCallback(async () => {
     try {
@@ -49,6 +75,11 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
 
   const refreshSession = useCallback(async () => {
     try {
+      // Avoid throwing "Auth session missing!" when the user isn't logged in
+      // (or auth hasn't hydrated yet).
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) return;
+
       const { data, error } = await supabase.auth.refreshSession();
       if (error) {
         console.warn('[KeepAlive] Session refresh failed:', error.message);
@@ -64,14 +95,27 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
     if (!isActiveRef.current) return;
 
     // Avoid piling up in-flight requests (a common cause of "network stops working" on mobile)
-    if (pingInFlightRef.current) return;
+    if (pingInFlightRef.current) {
+      // If the app was backgrounded mid-request, the promise can get "stuck".
+      // If it's been too long, treat it as stale and reset so recovery can proceed.
+      const age = Date.now() - (pingStartedAtRef.current || Date.now());
+      if (age > 15000) {
+        console.warn('[KeepAlive] Detected stale in-flight ping, aborting/resetting');
+        abortInFlightPing();
+      } else {
+        return;
+      }
+    }
     pingInFlightRef.current = true;
+    pingStartedAtRef.current = Date.now();
 
     const now = Date.now();
     const timeSinceLastPing = now - lastPingRef.current;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    pingAbortControllerRef.current = controller;
+    // Longer timeout than before: aggressive aborts can cause false failures on slow mobile.
+    pingAbortTimeoutRef.current = setTimeout(() => controller.abort(), 12000);
 
     try {
       // Simple lightweight query to keep connection alive
@@ -121,10 +165,9 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
         }
       }
     } finally {
-      clearTimeout(timeoutId);
-      pingInFlightRef.current = false;
+      clearInFlightPing();
     }
-  }, [refreshSession, reconnectChannels]);
+  }, [abortInFlightPing, clearInFlightPing, refreshSession, reconnectChannels]);
 
   const startKeepAlive = useCallback(() => {
     if (intervalRef.current) return;
@@ -142,7 +185,9 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
       intervalRef.current = null;
       console.log('[KeepAlive] Stopped');
     }
-  }, []);
+    // Ensure we never keep a "stuck" ping flagged as in-flight.
+    abortInFlightPing();
+  }, [abortInFlightPing]);
 
   const handleResume = useCallback(() => {
     console.log('[KeepAlive] App resumed - triggering recovery');
@@ -174,6 +219,14 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
       // App lifecycle
       try {
         handles.push(
+          App.addListener('appStateChange', ({ isActive }) => {
+            console.log('[KeepAlive] App state change:', { isActive });
+            if (isActive) {
+              handleResume();
+            } else {
+              handlePause();
+            }
+          }),
           App.addListener('resume', handleResume),
           App.addListener('pause', handlePause)
         );
@@ -216,7 +269,9 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
       }
     };
 
-    // Focus/blur for additional coverage
+    const isNative = Capacitor.isNativePlatform();
+
+    // Focus/online/offline are reliable on web, but can be noisy/unreliable in native webviews.
     const handleFocus = () => {
       console.log('[KeepAlive] Window focused');
       isActiveRef.current = true;
@@ -238,16 +293,20 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    if (!isNative) {
+      window.addEventListener('focus', handleFocus);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+    }
 
     return () => {
       stopKeepAlive();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      if (!isNative) {
+        window.removeEventListener('focus', handleFocus);
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      }
 
       handles.forEach((p) => p.then((h) => h.remove()).catch(() => {}));
     };

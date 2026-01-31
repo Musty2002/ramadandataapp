@@ -35,10 +35,17 @@ export function useNetworkStatus() {
     reconnectAttemptsRef.current++;
     
     try {
-      // First, try to refresh the auth session
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.warn('[NetworkStatus] Session refresh failed:', refreshError.message);
+      // First, try to refresh the auth session (only if we actually have one)
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session) {
+          const { error: refreshError } = await supabase.auth.refreshSession();
+          if (refreshError) {
+            console.warn('[NetworkStatus] Session refresh failed:', refreshError.message);
+          }
+        }
+      } catch (e) {
+        console.warn('[NetworkStatus] Session refresh error:', e);
       }
 
       // Get all active channels and reconnect them
