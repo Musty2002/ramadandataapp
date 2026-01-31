@@ -123,9 +123,24 @@ serve(async (req) => {
     });
 
     if (!emailResponse.ok) {
-      const errorData = await emailResponse.json();
-      console.error("Error sending email via Brevo:", errorData);
-      throw new Error("Failed to send reset code email");
+      let errorData: any = null;
+      try {
+        errorData = await emailResponse.json();
+      } catch {
+        // ignore
+      }
+
+      console.error("Error sending email via Brevo:", errorData ?? { status: emailResponse.status });
+
+      const brevoMessage =
+        (errorData && (errorData.message || errorData.error || errorData.msg)) ||
+        `Brevo returned status ${emailResponse.status}`;
+      const brevoCode = (errorData && (errorData.code || errorData.errorCode)) || undefined;
+
+      // Return a specific message so the client can show actionable feedback.
+      throw new Error(
+        `Email delivery failed${brevoCode ? ` (${brevoCode})` : ""}: ${String(brevoMessage)}`
+      );
     }
 
     console.log(`OTP email sent successfully to ${email}`);
