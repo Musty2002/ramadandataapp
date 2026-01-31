@@ -23,6 +23,8 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isActiveRef = useRef(true);
   const lastPingRef = useRef<number>(Date.now());
+  const pingInFlightRef = useRef(false);
+  const recoveryInFlightRef = useRef(false);
   const failedPingsRef = useRef(0);
   const maxFailedPings = 3;
 
@@ -61,8 +63,15 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
   const ping = useCallback(async (isRecovery = false) => {
     if (!isActiveRef.current) return;
 
+    // Avoid piling up in-flight requests (a common cause of "network stops working" on mobile)
+    if (pingInFlightRef.current) return;
+    pingInFlightRef.current = true;
+
     const now = Date.now();
     const timeSinceLastPing = now - lastPingRef.current;
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
       // Simple lightweight query to keep connection alive
@@ -70,6 +79,7 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
         .from('profiles')
         .select('id')
         .limit(1)
+        .abortSignal(controller.signal)
         .maybeSingle();
 
       if (error) {
@@ -81,9 +91,16 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
 
       // If this is a recovery ping or we've been away for too long, refresh everything
       if (isRecovery || timeSinceLastPing > 60000) {
-        console.log('[KeepAlive] Recovery mode - refreshing session and channels');
-        await refreshSession();
-        await reconnectChannels();
+        if (!recoveryInFlightRef.current) {
+          recoveryInFlightRef.current = true;
+          try {
+            console.log('[KeepAlive] Recovery mode - refreshing session and channels');
+            await refreshSession();
+            await reconnectChannels();
+          } finally {
+            recoveryInFlightRef.current = false;
+          }
+        }
       }
     } catch (error) {
       console.warn('[KeepAlive] Ping failed:', error);
@@ -91,11 +108,21 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
 
       // After multiple failures, try aggressive recovery
       if (failedPingsRef.current >= maxFailedPings) {
-        console.log('[KeepAlive] Multiple ping failures, attempting full recovery');
         failedPingsRef.current = 0;
-        await refreshSession();
-        await reconnectChannels();
+        if (!recoveryInFlightRef.current) {
+          recoveryInFlightRef.current = true;
+          try {
+            console.log('[KeepAlive] Multiple ping failures, attempting full recovery');
+            await refreshSession();
+            await reconnectChannels();
+          } finally {
+            recoveryInFlightRef.current = false;
+          }
+        }
       }
+    } finally {
+      clearTimeout(timeoutId);
+      pingInFlightRef.current = false;
     }
   }, [refreshSession, reconnectChannels]);
 
@@ -103,7 +130,10 @@ export function useKeepAlive(options: KeepAliveOptions = {}) {
     if (intervalRef.current) return;
 
     console.log('[KeepAlive] Starting with interval:', interval);
-    intervalRef.current = setInterval(() => ping(false), interval);
+    intervalRef.current = setInterval(() => {
+      // Only one ping at a time
+      ping(false);
+    }, interval);
   }, [interval, ping]);
 
   const stopKeepAlive = useCallback(() => {
