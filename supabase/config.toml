@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.sync-data-plans]
 verify_jwt = false
+
+[functions.keep-alive]
+verify_jwt = false
