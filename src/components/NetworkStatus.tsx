@@ -1,33 +1,23 @@
-import { useNetworkStatus } from '@/hooks/useNetworkStatus';
+import { useEffect, useState } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import { WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
-export function NetworkStatusBanner() {
-  const { isOnline } = useNetworkStatus();
-
-  // Don't show anything when online
-  if (isOnline) {
-    return null;
-  }
-
-  return (
-    <div
-      className={cn(
-        'fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm font-medium transition-all duration-300',
-        'bg-red-500 text-white'
-      )}
-    >
-      <div className="flex items-center justify-center gap-2">
-        <WifiOff className="w-4 h-4" />
-        <span>You're offline</span>
-      </div>
-    </div>
-  );
-}
-
+/**
+ * Minimal network status indicator using TanStack Query's online manager.
+ * TanStack Query handles all the reconnection logic automatically.
+ */
 export function NetworkStatusIndicator() {
-  const { isOnline } = useNetworkStatus();
+  const [isOnline, setIsOnline] = useState(onlineManager.isOnline());
+
+  useEffect(() => {
+    // Subscribe to online manager changes
+    const unsubscribe = onlineManager.subscribe((online) => {
+      setIsOnline(online);
+    });
+    return () => unsubscribe();
+  }, []);
 
   if (isOnline) {
     return null;
@@ -37,7 +27,7 @@ export function NetworkStatusIndicator() {
     <div
       className={cn(
         'fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all duration-300',
-        'bg-red-500 text-white'
+        'bg-destructive text-destructive-foreground'
       )}
     >
       <div className="flex items-center gap-2">

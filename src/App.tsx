@@ -47,7 +47,26 @@ import AdminSettings from "./pages/admin/AdminSettings";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 
 
-const queryClient = new QueryClient();
+// Configure QueryClient with network-resilient defaults
+// This handles retries, caching, and refetch on reconnect automatically
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 30, // 30 minutes (previously cacheTime)
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true, // Auto-refetch when coming back online
+      networkMode: 'online', // Only fetch when online
+    },
+    mutations: {
+      retry: 2,
+      retryDelay: 1000,
+      networkMode: 'online',
+    },
+  },
+});
 
 function RootRedirect() {
   const hostname = window.location.hostname.toLowerCase();
@@ -269,10 +288,10 @@ function AppRoutes() {
 }
 
 function NativeWrapper({ children }: { children: React.ReactNode }) {
-  // Initialize native features (network monitoring, keyboard handling)
+  // Initialize native features (keyboard handling only - network handled by TanStack Query)
   useNativeFeatures();
   
-  // Keep Supabase connection alive to prevent timeout issues
+  // Keep edge functions warm to prevent cold starts (simple 4-min ping)
   useKeepAlive();
   
   return <>{children}</>;
