@@ -273,7 +273,7 @@ function NativeWrapper({ children }: { children: React.ReactNode }) {
   useNativeFeatures();
   
   // Keep Supabase connection alive to prevent timeout issues
-  useKeepAlive({ interval: 30000 });
+  useKeepAlive();
   
   return <>{children}</>;
 }

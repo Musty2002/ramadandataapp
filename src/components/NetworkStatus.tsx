@@ -1,13 +1,13 @@
 import { useNetworkStatus } from '@/hooks/useNetworkStatus';
-import { Wifi, WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
+import { WifiOff, RefreshCw, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 export function NetworkStatusBanner() {
-  const { isOnline, isReconnecting, reconnect } = useNetworkStatus();
+  const { isOnline } = useNetworkStatus();
 
-  // Don't show anything when online and not reconnecting
-  if (isOnline && !isReconnecting) {
+  // Don't show anything when online
+  if (isOnline) {
     return null;
   }
 
@@ -15,38 +15,21 @@ export function NetworkStatusBanner() {
     <div
       className={cn(
         'fixed top-0 left-0 right-0 z-50 px-4 py-2 text-center text-sm font-medium transition-all duration-300',
-        isOnline
-          ? 'bg-yellow-500 text-yellow-950'
-          : 'bg-red-500 text-white'
+        'bg-red-500 text-white'
       )}
     >
       <div className="flex items-center justify-center gap-2">
-        {isOnline ? (
-          <>
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>Reconnecting...</span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="w-4 h-4" />
-            <span>You're offline</span>
-            <button
-              onClick={reconnect}
-              className="ml-2 underline hover:no-underline"
-            >
-              Retry
-            </button>
-          </>
-        )}
+        <WifiOff className="w-4 h-4" />
+        <span>You're offline</span>
       </div>
     </div>
   );
 }
 
 export function NetworkStatusIndicator() {
-  const { isOnline, isReconnecting } = useNetworkStatus();
+  const { isOnline } = useNetworkStatus();
 
-  if (isOnline && !isReconnecting) {
+  if (isOnline) {
     return null;
   }
 
@@ -54,23 +37,12 @@ export function NetworkStatusIndicator() {
     <div
       className={cn(
         'fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full shadow-lg text-sm font-medium transition-all duration-300',
-        isOnline
-          ? 'bg-yellow-500 text-yellow-950'
-          : 'bg-red-500 text-white'
+        'bg-red-500 text-white'
       )}
     >
       <div className="flex items-center gap-2">
-        {isOnline ? (
-          <>
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            <span>Syncing...</span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="w-4 h-4" />
-            <span>Offline</span>
-          </>
-        )}
+        <WifiOff className="w-4 h-4" />
+        <span>Offline</span>
       </div>
     </div>
   );
