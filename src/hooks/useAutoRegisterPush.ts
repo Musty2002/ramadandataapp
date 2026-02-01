@@ -95,14 +95,15 @@ export function useAutoRegisterPush() {
       console.error('Push registration error:', error);
     });
 
-    // Foreground notification handler
+    // Foreground notification handler - NON-BLOCKING to prevent interference with app resume
     const foregroundListener = PushNotifications.addListener(
       'pushNotificationReceived',
-      async (notification: PushNotificationSchema) => {
+      (notification: PushNotificationSchema) => {
         console.log('Push received in foreground:', notification);
         
         // Show local notification when app is in foreground
-        await LocalNotifications.schedule({
+        // Use non-blocking call to prevent interference with network sync
+        LocalNotifications.schedule({
           notifications: [
             {
               id: Date.now(),
@@ -112,6 +113,8 @@ export function useAutoRegisterPush() {
               channelId: 'default',
             },
           ],
+        }).catch(err => {
+          console.warn('Failed to schedule local notification:', err);
         });
       }
     );
