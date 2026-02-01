@@ -48,7 +48,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const FETCH_TIMEOUT = 8000; // 8 seconds - shorter for better UX
+const FETCH_TIMEOUT = 15000; // 15 seconds - mobile networks + background resume can be slow
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);

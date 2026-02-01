@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft, RefreshCw, WifiOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -57,6 +57,9 @@ export default function Data() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
+
+  // Prevent stale in-flight requests (e.g., after minimize/resume) from overwriting newer results.
+  const fetchPlansRequestIdRef = useRef(0);
   
   // Receipt state
   const [showReceipt, setShowReceipt] = useState(false);
@@ -88,9 +91,9 @@ export default function Data() {
   }, [selectedNetwork]);
 
   const fetchPlans = useCallback(async (network: string) => {
-    // Prevent concurrent fetches
-    if (loading) return;
-    
+    const requestId = ++fetchPlansRequestIdRef.current;
+    const hasExisting = plans.length > 0 && categories.length > 0;
+
     setLoading(true);
     setLoadError(null);
     
@@ -103,29 +106,36 @@ export default function Data() {
         .eq('is_active', true)
         .order('selling_price', { ascending: true });
 
-      // Use shorter timeout (8s) with 1 retry for better UX
+      // Use a slightly longer timeout; backgrounding can pause timers/network.
       const { data, error } = await withTimeout(
         fetchQuery(),
-        8000,
+        15000,
         'Connection timed out'
       );
 
       if (error) throw error;
 
-      const allPlans = (data || []) as unknown as DataPlan[];
-      setPlans(allPlans);
-      
-      const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
-      setCategories(uniqueCategories);
-      setLoadError(null);
+       if (requestId !== fetchPlansRequestIdRef.current) return;
+
+       const allPlans = (data || []) as unknown as DataPlan[];
+       setPlans(allPlans);
+
+       const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
+       setCategories(uniqueCategories);
+       setLoadError(null);
     } catch (error) {
       console.error('Error fetching plans:', error);
       const message = error instanceof Error ? error.message : 'Failed to load data plans';
-      setLoadError(message);
-      
-      // Clear any stale data on error
-      setPlans([]);
-      setCategories([]);
+      if (requestId !== fetchPlansRequestIdRef.current) return;
+
+      // If we already have plans/categories on screen, keep them (don’t brick the flow on resume).
+      if (!hasExisting) {
+        setLoadError(message);
+        setPlans([]);
+        setCategories([]);
+      } else {
+        setLoadError(null);
+      }
       
       toast({
         variant: 'destructive',
@@ -135,9 +145,11 @@ export default function Data() {
           : 'Could not load plans. Please try again.',
       });
     } finally {
-      setLoading(false);
+      if (requestId === fetchPlansRequestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [toast, loading]);
+  }, [toast, plans.length, categories.length]);
 
   // Handler for timeout retry - defined after fetchPlans
   const handleTimeoutRetry = useCallback(() => {

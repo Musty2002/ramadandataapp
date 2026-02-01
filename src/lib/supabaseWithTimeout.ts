@@ -26,35 +26,84 @@ export async function withTimeout<T>(
   timeout: number = DEFAULT_TIMEOUT,
   errorMessage: string = 'Request timed out'
 ): Promise<T> {
-  // Create timeout tracking
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
-  let hasTimedOut = false;
-  
-  // Convert to a proper Promise immediately to avoid thenable issues
-  const promise = new Promise<T>((resolve, reject) => {
-    // Wrap the thenable resolution
-    Promise.resolve(promiseOrThenable).then(resolve).catch(reject);
-  });
-  
+  // Convert to a proper Promise immediately to avoid thenable issues.
+  const promise = Promise.resolve(promiseOrThenable as any) as Promise<T>;
+
+  // IMPORTANT (mobile): Android/iOS may pause JS timers when the app is backgrounded.
+  // A plain setTimeout-based Promise.race can therefore fire “late” on resume and falsely
+  // mark successful requests as timed out.
+  //
+  // This timeout only counts time while the document is visible.
+  let activeElapsedMs = 0;
+  let lastTickMs = Date.now();
+  let intervalId: ReturnType<typeof setInterval> | undefined;
+  let didTimeout = false;
+  let rejectTimeout: ((err: Error) => void) | undefined;
+
+  const isVisible = () => {
+    if (typeof document === 'undefined') return true;
+    return document.visibilityState === 'visible';
+  };
+
+  const stop = () => {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = undefined;
+    }
+  };
+
+  const cleanup = () => {
+    stop();
+    rejectTimeout = undefined;
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    }
+  };
+
+  const tick = () => {
+    if (!isVisible() || didTimeout) return;
+    const now = Date.now();
+    activeElapsedMs += Math.max(0, now - lastTickMs);
+    lastTickMs = now;
+    if (activeElapsedMs >= timeout) {
+      didTimeout = true;
+      stop();
+      rejectTimeout?.(new Error(errorMessage));
+    }
+  };
+
+  const start = () => {
+    if (intervalId || didTimeout) return;
+    lastTickMs = Date.now();
+    intervalId = setInterval(tick, 250);
+  };
+
+  const onVisibilityChange = () => {
+    // Pause the timeout clock while hidden, resume when visible again.
+    if (isVisible()) {
+      lastTickMs = Date.now();
+      start();
+    } else {
+      stop();
+    }
+  };
+
   const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      hasTimedOut = true;
-      reject(new Error(errorMessage));
-    }, timeout);
+    rejectTimeout = reject;
   });
 
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisibilityChange);
+  }
+  if (isVisible()) start();
+
   try {
-    const result = await Promise.race([promise, timeoutPromise]);
-    if (timeoutId) clearTimeout(timeoutId);
-    return result;
+    return await Promise.race([promise, timeoutPromise]);
   } catch (error) {
-    if (timeoutId) clearTimeout(timeoutId);
-    
-    // If it's a timeout error, throw with clear message
-    if (hasTimedOut) {
-      throw new Error(errorMessage);
-    }
+    if (didTimeout) throw new Error(errorMessage);
     throw error;
+  } finally {
+    cleanup();
   }
 }
 
