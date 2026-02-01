@@ -11,6 +11,7 @@ import { useAppReady } from "@/hooks/useAppReady";
 import { AppLockGate } from "@/components/AppLockGate";
 import { useNativeFeatures } from "@/hooks/useNativeFeatures";
 import { useKeepAlive } from "@/hooks/useKeepAlive";
+import { useCapacitorNetworkSync } from "@/hooks/useCapacitorNetworkSync";
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -291,6 +292,9 @@ function AppRoutes() {
 function NativeWrapper({ children }: { children: React.ReactNode }) {
   // Initialize native features (keyboard handling only - network handled by TanStack Query)
   useNativeFeatures();
+  
+  // Sync Capacitor network/app state with TanStack Query for reliable reconnection
+  useCapacitorNetworkSync(queryClient);
   
   // Keep edge functions warm to prevent cold starts (simple 4-min ping)
   useKeepAlive();
