@@ -1,7 +1,8 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, PushNotificationSchema } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
+import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
@@ -10,6 +11,11 @@ import { supabase } from '@/integrations/supabase/client';
 export function useAutoRegisterPush() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const fcmTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    fcmTokenRef.current = fcmToken;
+  }, [fcmToken]);
 
   const saveTokenToBackend = useCallback(async (token: string, userId?: string) => {
     try {
@@ -81,13 +87,17 @@ export function useAutoRegisterPush() {
     if (!Capacitor.isNativePlatform()) return;
 
     // Registration success handler
-    const registrationListener = PushNotifications.addListener('registration', async (token: Token) => {
+    const registrationListener = PushNotifications.addListener('registration', (token: Token) => {
       console.log('Push registration success, token:', token.value);
       setFcmToken(token.value);
       
-      // Get current user if logged in
-      const { data: { user } } = await supabase.auth.getUser();
-      await saveTokenToBackend(token.value, user?.id);
+      // IMPORTANT: Do not block the registration callback.
+      // Defer backend sync until after resume/network recovery.
+      setTimeout(() => {
+        void supabase.auth
+          .getUser()
+          .then(({ data }) => saveTokenToBackend(token.value, data.user?.id));
+      }, 1500);
     });
 
     // Registration error handler
@@ -127,6 +137,19 @@ export function useAutoRegisterPush() {
       }
     );
 
+    // On resume, re-sync token (non-blocking) after the network sync hook has time to run.
+    const appStateListener = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive) return;
+      const token = fcmTokenRef.current;
+      if (!token) return;
+
+      setTimeout(() => {
+        void supabase.auth
+          .getUser()
+          .then(({ data }) => saveTokenToBackend(token, data.user?.id));
+      }, 1500);
+    });
+
     // Initialize immediately on mount
     initializePushNotifications();
 
@@ -136,6 +159,7 @@ export function useAutoRegisterPush() {
       errorListener.then(l => l.remove());
       foregroundListener.then(l => l.remove());
       actionListener.then(l => l.remove());
+      appStateListener.then(l => l.remove());
     };
   }, [initializePushNotifications, saveTokenToBackend]);
 
