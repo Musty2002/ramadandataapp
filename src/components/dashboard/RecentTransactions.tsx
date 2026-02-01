@@ -71,7 +71,7 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
 
       const { data, error: queryError } = await withTimeout(
         fetchQuery(),
-        8000, // 8 second timeout
+        15000, // more forgiving on mobile
         'Connection timed out'
       );
 
