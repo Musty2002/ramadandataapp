@@ -2,16 +2,18 @@ import { useEffect, useCallback, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, PushNotificationSchema } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
-import { App } from '@capacitor/app';
 import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Auto-register push notifications on app launch - works without user login
+ * Uses singleton pattern with refs to prevent double initialization
  */
 export function useAutoRegisterPush() {
   const [isRegistered, setIsRegistered] = useState(false);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const fcmTokenRef = useRef<string | null>(null);
+  const initialized = useRef(false);
+  const isInitializing = useRef(false);
 
   useEffect(() => {
     fcmTokenRef.current = fcmToken;
@@ -32,20 +34,30 @@ export function useAutoRegisterPush() {
       });
 
       if (error) throw error;
-      console.log('Push token registered:', data);
+      console.log('[AutoRegisterPush] Push token registered:', data);
       return data;
     } catch (error) {
-      console.error('Error saving push token:', error);
+      console.error('[AutoRegisterPush] Error saving push token:', error);
     }
   }, []);
 
   const initializePushNotifications = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) {
-      console.log('Push notifications only work on native platforms');
+      console.log('[AutoRegisterPush] Push notifications only work on native platforms');
       return;
     }
 
+    // Guard against multiple initializations
+    if (initialized.current || isInitializing.current) {
+      console.log('[AutoRegisterPush] Already initialized, skipping');
+      return;
+    }
+    isInitializing.current = true;
+
     try {
+      // CRITICAL: Remove existing listeners BEFORE adding new ones
+      await PushNotifications.removeAllListeners();
+
       // Create default notification channel for Android
       if (Capacitor.getPlatform() === 'android') {
         await LocalNotifications.createChannel({
@@ -57,7 +69,7 @@ export function useAutoRegisterPush() {
           sound: 'default',
           vibration: true,
         });
-        console.log('Created default notification channel');
+        console.log('[AutoRegisterPush] Created default notification channel');
       }
 
       // Check current permission status
@@ -69,50 +81,37 @@ export function useAutoRegisterPush() {
       }
 
       if (permStatus.receive !== 'granted') {
-        console.log('Push notification permission not granted');
+        console.log('[AutoRegisterPush] Push notification permission not granted');
+        isInitializing.current = false;
         return;
       }
 
-      // Register for push notifications
-      await PushNotifications.register();
-      console.log('Registered for push notifications');
-      setIsRegistered(true);
-
-    } catch (error) {
-      console.error('Error initializing push notifications:', error);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-
-    // Registration success handler
-    const registrationListener = PushNotifications.addListener('registration', (token: Token) => {
-      console.log('Push registration success, token:', token.value);
-      setFcmToken(token.value);
-      
-      // IMPORTANT: Do not block the registration callback.
-      // Defer backend sync until after resume/network recovery.
-      setTimeout(() => {
-        void supabase.auth
-          .getUser()
-          .then(({ data }) => saveTokenToBackend(token.value, data.user?.id));
-      }, 1500);
-    });
-
-    // Registration error handler
-    const errorListener = PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', error);
-    });
-
-    // Foreground notification handler - NON-BLOCKING to prevent interference with app resume
-    const foregroundListener = PushNotifications.addListener(
-      'pushNotificationReceived',
-      (notification: PushNotificationSchema) => {
-        console.log('Push received in foreground:', notification);
+      // Add listeners AFTER removing old ones
+      PushNotifications.addListener('registration', (token: Token) => {
+        console.log('[AutoRegisterPush] Push registration success, token:', token.value);
+        setFcmToken(token.value);
+        initialized.current = true;
+        isInitializing.current = false;
         
-        // Show local notification when app is in foreground
-        // Use non-blocking call to prevent interference with network sync
+        // IMPORTANT: Do not block the registration callback.
+        // Defer backend sync to avoid blocking network recovery.
+        setTimeout(() => {
+          void supabase.auth
+            .getUser()
+            .then(({ data }) => saveTokenToBackend(token.value, data.user?.id));
+        }, 1500);
+      });
+
+      PushNotifications.addListener('registrationError', (error) => {
+        console.error('[AutoRegisterPush] Push registration error:', error);
+        isInitializing.current = false;
+      });
+
+      // Foreground notification handler - NON-BLOCKING
+      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+        console.log('[AutoRegisterPush] Push received in foreground:', notification);
+        
+        // Show local notification when app is in foreground (non-blocking)
         LocalNotifications.schedule({
           notifications: [
             {
@@ -124,57 +123,53 @@ export function useAutoRegisterPush() {
             },
           ],
         }).catch(err => {
-          console.warn('Failed to schedule local notification:', err);
+          console.warn('[AutoRegisterPush] Failed to schedule local notification:', err);
         });
-      }
-    );
+      });
 
-    // Notification action handler
-    const actionListener = PushNotifications.addListener(
-      'pushNotificationActionPerformed',
-      (action) => {
-        console.log('Push action performed:', action);
-      }
-    );
+      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        console.log('[AutoRegisterPush] Push action performed:', action);
+      });
 
-    // On resume, re-sync token (non-blocking) after the network sync hook has time to run.
-    const appStateListener = App.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive) return;
-      const token = fcmTokenRef.current;
-      if (!token) return;
+      // Register for push notifications
+      await PushNotifications.register();
+      console.log('[AutoRegisterPush] Registered for push notifications');
+      setIsRegistered(true);
 
-      setTimeout(() => {
-        void supabase.auth
-          .getUser()
-          .then(({ data }) => saveTokenToBackend(token, data.user?.id));
-      }, 1500);
-    });
+    } catch (error) {
+      console.error('[AutoRegisterPush] Error initializing push notifications:', error);
+      isInitializing.current = false;
+    }
+  }, [saveTokenToBackend]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
 
     // Initialize immediately on mount
     initializePushNotifications();
 
-    // Cleanup
+    // Cleanup on unmount
     return () => {
-      registrationListener.then(l => l.remove());
-      errorListener.then(l => l.remove());
-      foregroundListener.then(l => l.remove());
-      actionListener.then(l => l.remove());
-      appStateListener.then(l => l.remove());
+      PushNotifications.removeAllListeners();
     };
-  }, [initializePushNotifications, saveTokenToBackend]);
+  }, [initializePushNotifications]);
 
-  // Also update token with user_id when user logs in
+  // Update token with user_id when user logs in
   useEffect(() => {
     if (!fcmToken) return;
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session?.user && fcmToken) {
-        // Update the token with the user's ID
-        await saveTokenToBackend(fcmToken, session.user.id);
+        // Defer to avoid blocking auth flow
+        setTimeout(() => {
+          void saveTokenToBackend(fcmToken, session.user.id);
+        }, 1500);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [fcmToken, saveTokenToBackend]);
 
   return {

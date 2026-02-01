@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import { Network } from "@capacitor/network";
 import { App } from "@capacitor/app";
@@ -11,33 +11,37 @@ import { supabase } from "@/integrations/supabase/client";
  * browser-based online detection fails after app minimize/resume.
  */
 export function useCapacitorNetworkSync(queryClient: QueryClient) {
+  const initialized = useRef(false);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-
-    let removeNetwork: { remove: () => Promise<void> } | null = null;
-    let removeAppState: { remove: () => Promise<void> } | null = null;
+    if (initialized.current) return;
+    initialized.current = true;
 
     const setup = async () => {
       try {
+        // CRITICAL: Remove existing listeners before adding new ones
+        await Network.removeAllListeners();
+        await App.removeAllListeners();
+
         // Initialize online state once
         const status = await Network.getStatus();
         console.log('[CapacitorNetworkSync] Initial network status:', status.connected);
         onlineManager.setOnline(status.connected);
 
         // Keep TanStack "online" state accurate on native
-        removeNetwork = await Network.addListener("networkStatusChange", (s) => {
+        Network.addListener("networkStatusChange", (s) => {
           console.log('[CapacitorNetworkSync] Network status changed:', s.connected);
           onlineManager.setOnline(!!s.connected);
         });
 
         // On resume: refresh session + refetch critical queries
-        removeAppState = await App.addListener("appStateChange", async ({ isActive }) => {
+        App.addListener("appStateChange", async ({ isActive }) => {
           console.log('[CapacitorNetworkSync] App state changed, isActive:', isActive);
           focusManager.setFocused(isActive);
 
           if (isActive) {
             // 1) Make sure auth/session is not stale after sleep
-            // (supabase-js usually handles it, but mobile sleep can pause refresh timers)
             try {
               await supabase.auth.getSession();
               console.log('[CapacitorNetworkSync] Session refreshed on resume');
@@ -61,8 +65,9 @@ export function useCapacitorNetworkSync(queryClient: QueryClient) {
     setup();
 
     return () => {
-      removeNetwork?.remove();
-      removeAppState?.remove();
+      // Proper cleanup on unmount
+      Network.removeAllListeners();
+      App.removeAllListeners();
     };
   }, [queryClient]);
 }

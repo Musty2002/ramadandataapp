@@ -6,13 +6,17 @@ const KEEP_ALIVE_INTERVAL = 4 * 60 * 1000;
 
 /**
  * Simple keep-alive hook that pings the backend every 4 minutes
- * to prevent connection timeouts. Based on proven pattern from
- * stable mobile app implementation.
+ * to prevent connection timeouts. Uses proper interval cleanup.
  */
 export function useKeepAlive() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
+    // Guard against double initialization
+    if (initialized.current) return;
+    initialized.current = true;
+
     const pingBackend = async () => {
       try {
         await supabase.functions.invoke('keep-alive');
@@ -29,6 +33,7 @@ export function useKeepAlive() {
     intervalRef.current = setInterval(pingBackend, KEEP_ALIVE_INTERVAL);
 
     return () => {
+      // MUST clear interval on unmount
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
