@@ -323,12 +323,12 @@ const App = () => {
         )}
         <BrowserRouter>
           <AuthProvider>
-            <PushNotificationProvider>
-              <NativeWrapper>
+            <NativeWrapper>
+              <PushNotificationProvider>
                 <NetworkStatusIndicator />
                 <AppRoutes />
-              </NativeWrapper>
-            </PushNotificationProvider>
+              </PushNotificationProvider>
+            </NativeWrapper>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

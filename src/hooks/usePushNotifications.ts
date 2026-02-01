@@ -104,10 +104,14 @@ export function usePushNotifications() {
     if (!Capacitor.isNativePlatform() || !user) return;
 
     // Registration success handler
-    const registrationListener = PushNotifications.addListener('registration', async (token: Token) => {
+    const registrationListener = PushNotifications.addListener('registration', (token: Token) => {
       console.log('Push registration success, token:', token.value);
       setFcmToken(token.value);
-      await saveTokenToDatabase(token.value);
+
+      // Don't block the registration callback; defer token persistence.
+      setTimeout(() => {
+        void saveTokenToDatabase(token.value);
+      }, 1500);
     });
 
     // Registration error handler
