@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Keyboard } from '@capacitor/keyboard';
 
@@ -9,12 +9,18 @@ import { Keyboard } from '@capacitor/keyboard';
  */
 export function useNativeFeatures() {
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
+    if (initialized.current) return;
+    initialized.current = true;
 
     const initKeyboard = async () => {
       try {
+        // CRITICAL: Remove existing listeners before adding new ones
+        await Keyboard.removeAllListeners();
+
         Keyboard.addListener('keyboardWillShow', () => {
           setIsKeyboardOpen(true);
           document.body.classList.add('keyboard-open');
@@ -34,6 +40,8 @@ export function useNativeFeatures() {
           setIsKeyboardOpen(false);
           document.body.classList.remove('keyboard-open');
         });
+
+        console.log('[NativeFeatures] Keyboard listeners added');
       } catch (error) {
         console.warn('[NativeFeatures] Failed to add keyboard listeners:', error);
       }
@@ -42,11 +50,8 @@ export function useNativeFeatures() {
     initKeyboard();
 
     return () => {
-      try {
-        Keyboard.removeAllListeners();
-      } catch {
-        // Ignore cleanup errors
-      }
+      // Proper cleanup on unmount
+      Keyboard.removeAllListeners();
     };
   }, []);
 

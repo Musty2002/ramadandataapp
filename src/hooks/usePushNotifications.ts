@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications, Token, PushNotificationSchema } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -9,15 +9,16 @@ export function usePushNotifications() {
   const { user } = useAuth();
   const [isRegistered, setIsRegistered] = useState(false);
   const [fcmToken, setFcmToken] = useState<string | null>(null);
+  const initialized = useRef(false);
+  const isInitializing = useRef(false);
 
   const saveTokenToDatabase = useCallback(async (token: string) => {
     if (!user) {
-      console.log('No user logged in, skipping token save');
+      console.log('[PushNotifications] No user logged in, skipping token save');
       return;
     }
 
     try {
-      // Check if subscription already exists for this user
       const { data: existing } = await supabase
         .from('push_subscriptions')
         .select('id')
@@ -25,7 +26,6 @@ export function usePushNotifications() {
         .single();
 
       if (existing) {
-        // Update existing subscription
         const { error } = await supabase
           .from('push_subscriptions')
           .update({ 
@@ -35,9 +35,8 @@ export function usePushNotifications() {
           .eq('id', existing.id);
 
         if (error) throw error;
-        console.log('Updated push subscription');
+        console.log('[PushNotifications] Updated push subscription');
       } else {
-        // Insert new subscription
         const { error } = await supabase
           .from('push_subscriptions')
           .insert({
@@ -50,20 +49,30 @@ export function usePushNotifications() {
           });
 
         if (error) throw error;
-        console.log('Created new push subscription');
+        console.log('[PushNotifications] Created new push subscription');
       }
     } catch (error) {
-      console.error('Error saving push token:', error);
+      console.error('[PushNotifications] Error saving push token:', error);
     }
   }, [user]);
 
   const initializePushNotifications = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) {
-      console.log('Push notifications only work on native platforms');
+      console.log('[PushNotifications] Push notifications only work on native platforms');
       return;
     }
 
+    // Guard against multiple initializations
+    if (initialized.current || isInitializing.current) {
+      console.log('[PushNotifications] Already initialized, skipping');
+      return;
+    }
+    isInitializing.current = true;
+
     try {
+      // CRITICAL: Remove existing listeners BEFORE adding new ones
+      await PushNotifications.removeAllListeners();
+
       // Create default notification channel for Android
       if (Capacitor.getPlatform() === 'android') {
         await LocalNotifications.createChannel({
@@ -75,7 +84,7 @@ export function usePushNotifications() {
           sound: 'default',
           vibration: true,
         });
-        console.log('Created default notification channel');
+        console.log('[PushNotifications] Created default notification channel');
       }
 
       // Request permission
@@ -86,47 +95,34 @@ export function usePushNotifications() {
       }
 
       if (permStatus.receive !== 'granted') {
-        console.log('Push notification permission not granted');
+        console.log('[PushNotifications] Push notification permission not granted');
+        isInitializing.current = false;
         return;
       }
 
-      // Register for push notifications
-      await PushNotifications.register();
-      console.log('Registered for push notifications');
-      setIsRegistered(true);
+      // Add listeners AFTER removing old ones
+      PushNotifications.addListener('registration', (token: Token) => {
+        console.log('[PushNotifications] Push registration success, token:', token.value);
+        setFcmToken(token.value);
+        initialized.current = true;
+        isInitializing.current = false;
 
-    } catch (error) {
-      console.error('Error initializing push notifications:', error);
-    }
-  }, []);
+        // Don't block the registration callback; defer token persistence.
+        setTimeout(() => {
+          void saveTokenToDatabase(token.value);
+        }, 1500);
+      });
 
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !user) return;
+      PushNotifications.addListener('registrationError', (error) => {
+        console.error('[PushNotifications] Push registration error:', error);
+        isInitializing.current = false;
+      });
 
-    // Registration success handler
-    const registrationListener = PushNotifications.addListener('registration', (token: Token) => {
-      console.log('Push registration success, token:', token.value);
-      setFcmToken(token.value);
-
-      // Don't block the registration callback; defer token persistence.
-      setTimeout(() => {
-        void saveTokenToDatabase(token.value);
-      }, 1500);
-    });
-
-    // Registration error handler
-    const errorListener = PushNotifications.addListener('registrationError', (error) => {
-      console.error('Push registration error:', error);
-    });
-
-    // Foreground notification handler - NON-BLOCKING to prevent interference with app resume
-    const foregroundListener = PushNotifications.addListener(
-      'pushNotificationReceived',
-      (notification: PushNotificationSchema) => {
-        console.log('Push received in foreground:', notification);
+      // Foreground notification handler - NON-BLOCKING
+      PushNotifications.addListener('pushNotificationReceived', (notification: PushNotificationSchema) => {
+        console.log('[PushNotifications] Push received in foreground:', notification);
         
-        // Show local notification when app is in foreground
-        // Use non-blocking call to prevent interference with network sync
+        // Show local notification when app is in foreground (non-blocking)
         LocalNotifications.schedule({
           notifications: [
             {
@@ -138,35 +134,40 @@ export function usePushNotifications() {
             },
           ],
         }).catch(err => {
-          console.warn('Failed to schedule local notification:', err);
+          console.warn('[PushNotifications] Failed to schedule local notification:', err);
         });
-      }
-    );
+      });
 
-    // Notification action handler
-    const actionListener = PushNotifications.addListener(
-      'pushNotificationActionPerformed',
-      (action) => {
-        console.log('Push action performed:', action);
-        // Handle notification tap - can navigate to specific screens based on data
-      }
-    );
+      PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
+        console.log('[PushNotifications] Push action performed:', action);
+      });
+
+      // Register for push notifications
+      await PushNotifications.register();
+      console.log('[PushNotifications] Registered for push notifications');
+      setIsRegistered(true);
+
+    } catch (error) {
+      console.error('[PushNotifications] Error initializing push notifications:', error);
+      isInitializing.current = false;
+    }
+  }, [saveTokenToDatabase]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !user) return;
 
     // Initialize
     initializePushNotifications();
 
-    // Cleanup
+    // Cleanup on unmount
     return () => {
-      registrationListener.then(l => l.remove());
-      errorListener.then(l => l.remove());
-      foregroundListener.then(l => l.remove());
-      actionListener.then(l => l.remove());
+      PushNotifications.removeAllListeners();
     };
-  }, [user, initializePushNotifications, saveTokenToDatabase]);
+  }, [user, initializePushNotifications]);
 
   const requestPermission = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) {
-      console.log('Push notifications only work on native platforms');
+      console.log('[PushNotifications] Push notifications only work on native platforms');
       return false;
     }
 
