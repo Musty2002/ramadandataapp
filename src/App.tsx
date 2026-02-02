@@ -46,6 +46,7 @@ import AdminDataPlans from "./pages/admin/AdminDataPlans";
 import AdminAirtimePlans from "./pages/admin/AdminAirtimePlans";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminNotifications from "./pages/admin/AdminNotifications";
+import AdminReferrals from "./pages/admin/AdminReferrals";
 
 
 // Configure QueryClient with offline-first caching
@@ -282,6 +283,7 @@ function AppRoutes() {
       <Route path="/admin/data-plans" element={<AdminDataPlans />} />
       <Route path="/admin/airtime-plans" element={<AdminAirtimePlans />} />
       <Route path="/admin/notifications" element={<AdminNotifications />} />
+      <Route path="/admin/referrals" element={<AdminReferrals />} />
       <Route path="/admin/settings" element={<AdminSettings />} />
       
       <Route path="*" element={<NotFound />} />

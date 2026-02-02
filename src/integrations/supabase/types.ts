@@ -445,10 +445,44 @@ export type Database = {
         }
         Relationships: []
       }
+      referral_settings: {
+        Row: {
+          id: string
+          is_enabled: boolean
+          min_funding_amount: number
+          referrer_bonus: number
+          requires_approval: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          is_enabled?: boolean
+          min_funding_amount?: number
+          referrer_bonus?: number
+          requires_approval?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          is_enabled?: boolean
+          min_funding_amount?: number
+          referrer_bonus?: number
+          requires_approval?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           bonus_paid_at: string | null
           created_at: string
+          funding_amount: number | null
+          funding_triggered_at: string | null
           id: string
           referee_bonus: number | null
           referee_id: string
@@ -457,8 +491,12 @@ export type Database = {
           status: Database["public"]["Enums"]["referral_status"]
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           bonus_paid_at?: string | null
           created_at?: string
+          funding_amount?: number | null
+          funding_triggered_at?: string | null
           id?: string
           referee_bonus?: number | null
           referee_id: string
@@ -467,8 +505,12 @@ export type Database = {
           status?: Database["public"]["Enums"]["referral_status"]
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           bonus_paid_at?: string | null
           created_at?: string
+          funding_amount?: number | null
+          funding_triggered_at?: string | null
           id?: string
           referee_bonus?: number | null
           referee_id?: string
