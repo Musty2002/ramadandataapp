@@ -206,7 +206,7 @@ export default function Referral() {
                 <p className="text-sm text-primary-foreground/90 mb-4">
                   Invite friends to join. When they fund their account with at least 
                   <strong> ₦{settings?.min_funding_amount?.toLocaleString() || '1,000'}</strong>, 
-                  you'll earn <strong>₦{settings?.referrer_bonus || 50}</strong> after admin approval.
+                  you'll earn <strong>₦{settings?.referrer_bonus || 50}</strong>!
                 </p>
 
                 {/* Referral Code Box */}
