@@ -1,10 +1,4 @@
 {
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ],
   "redirects": [
     {
       "source": "/",
@@ -36,19 +30,25 @@
           "value": "admin.ramadandataapp.com.ng"
         }
       ],
-      "destination": "/admin",
-      "permanent": true
+      "destination": "/admin/login",
+      "permanent": false
     },
     {
-      "source": "/:path((?!admin|assets).*)",
+      "source": "/:path((?!admin|assets|_next).*)",
       "has": [
         {
           "type": "host",
           "value": "admin.ramadandataapp.com.ng"
         }
       ],
-      "destination": "/admin",
+      "destination": "/admin/login",
       "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
