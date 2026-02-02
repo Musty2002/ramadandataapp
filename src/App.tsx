@@ -12,6 +12,8 @@ import { AppLockGate } from "@/components/AppLockGate";
 import { useNativeFeatures } from "@/hooks/useNativeFeatures";
 import { useKeepAlive } from "@/hooks/useKeepAlive";
 import { useCapacitorNetworkSync } from "@/hooks/useCapacitorNetworkSync";
+import { isNativePlatform } from "@/hooks/usePlatform";
+
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -36,6 +38,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import DeleteAccount from "./pages/DeleteAccount";
 import NotFound from "./pages/NotFound";
 import ExamPins from "./pages/ExamPins";
+import DownloadApp from "./pages/DownloadApp";
 
 // Admin pages
 import AdminLogin from "./pages/admin/AdminLogin";
@@ -75,11 +78,21 @@ function RootRedirect() {
   const hostname = window.location.hostname.toLowerCase();
   const isAdminHost = hostname === "admin.ramadandataapp.com.ng";
 
+  // Non-admin web users should be redirected to download app
+  if (!isAdminHost && !isNativePlatform()) {
+    return <Navigate to="/download-app" replace />;
+  }
+
   return <Navigate to={isAdminHost ? "/admin" : "/dashboard"} replace />;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+
+  // Block web access for security - redirect to download app page
+  if (!isNativePlatform()) {
+    return <Navigate to="/download-app" replace />;
+  }
 
   if (loading) {
     return (
@@ -100,6 +113,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
+  // Block web access for security - redirect to download app page
+  if (!isNativePlatform()) {
+    return <Navigate to="/download-app" replace />;
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -119,6 +137,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<RootRedirect />} />
+      <Route path="/download-app" element={<DownloadApp />} />
       <Route path="/website" element={<Website />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/delete-account" element={<DeleteAccount />} />
