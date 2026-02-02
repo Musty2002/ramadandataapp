@@ -59,9 +59,22 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Parse URL to get the action
+    // Parse URL to get the action - support both query param and body
     const url = new URL(req.url)
-    const action = url.searchParams.get('action')
+    let action = url.searchParams.get('action')
+    
+    // For POST requests, also check body for action
+    let body: any = {}
+    if (req.method === 'POST') {
+      try {
+        body = await req.json()
+        if (!action && body.action) {
+          action = body.action
+        }
+      } catch {
+        // Body might be empty for some requests
+      }
+    }
 
     // Handle different admin actions
     switch (action) {
@@ -144,7 +157,6 @@ Deno.serve(async (req) => {
           })
         }
 
-        const body = await req.json()
         const { user_id, amount, description } = body
 
         if (!user_id || !amount || amount <= 0) {
@@ -202,7 +214,6 @@ Deno.serve(async (req) => {
           })
         }
 
-        const body = await req.json()
         const { transaction_id, user_id, amount, description, reference } = body
 
         if (!user_id || !amount || amount <= 0) {
@@ -306,6 +317,173 @@ Deno.serve(async (req) => {
             recentTransactions: recentWithUsers,
           }
         }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'get_referrals': {
+        // Get all referrals with referrer and referee info
+        const { data: referrals, error: refError } = await supabaseAdmin
+          .from('referrals')
+          .select('*')
+          .order('created_at', { ascending: false })
+
+        if (refError) throw refError
+
+        // Fetch profile info for referrers and referees
+        const enrichedReferrals = await Promise.all(
+          (referrals || []).map(async (ref) => {
+            const [referrerRes, refereeRes] = await Promise.all([
+              supabaseAdmin
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', ref.referrer_id)
+                .maybeSingle(),
+              supabaseAdmin
+                .from('profiles')
+                .select('full_name, email')
+                .eq('id', ref.referee_id)
+                .maybeSingle()
+            ])
+
+            return {
+              ...ref,
+              referrer: referrerRes.data,
+              referee: refereeRes.data,
+            }
+          })
+        )
+
+        return new Response(JSON.stringify({ referrals: enrichedReferrals }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'approve_referral': {
+        const { referral_id } = body
+
+        if (!referral_id) {
+          return new Response(JSON.stringify({ error: 'Missing referral_id' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        // Get referral details
+        const { data: referral, error: refError } = await supabaseAdmin
+          .from('referrals')
+          .select('*, referrer:referrer_id(user_id, full_name)')
+          .eq('id', referral_id)
+          .single()
+
+        if (refError || !referral) {
+          return new Response(JSON.stringify({ error: 'Referral not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        // Get referral settings for bonus amount
+        const { data: settings } = await supabaseAdmin
+          .from('referral_settings')
+          .select('referrer_bonus')
+          .limit(1)
+          .single()
+
+        const bonusAmount = settings?.referrer_bonus || referral.referrer_bonus || 50
+
+        // Get referrer's user_id from profiles
+        const { data: referrerProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('user_id')
+          .eq('id', referral.referrer_id)
+          .single()
+
+        if (!referrerProfile) {
+          return new Response(JSON.stringify({ error: 'Referrer not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        // Credit the referrer's wallet
+        const { data: wallet } = await supabaseAdmin
+          .from('wallets')
+          .select('balance')
+          .eq('user_id', referrerProfile.user_id)
+          .single()
+
+        const newBalance = Number(wallet?.balance || 0) + Number(bonusAmount)
+
+        await supabaseAdmin
+          .from('wallets')
+          .update({ balance: newBalance })
+          .eq('user_id', referrerProfile.user_id)
+
+        // Create transaction for the bonus
+        await supabaseAdmin
+          .from('transactions')
+          .insert({
+            user_id: referrerProfile.user_id,
+            type: 'credit',
+            category: 'referral_bonus',
+            amount: bonusAmount,
+            description: 'Referral bonus',
+            status: 'completed',
+            reference: `REF-BONUS-${referral_id}`,
+          })
+
+        // Update referral status
+        await supabaseAdmin
+          .from('referrals')
+          .update({
+            status: 'bonus_paid',
+            approved_by: user.id,
+            approved_at: new Date().toISOString(),
+            bonus_paid_at: new Date().toISOString(),
+            referrer_bonus: bonusAmount,
+          })
+          .eq('id', referral_id)
+
+        // Create notification for the referrer
+        await supabaseAdmin
+          .from('notifications')
+          .insert({
+            user_id: referrerProfile.user_id,
+            title: 'Referral Bonus Received! 🎉',
+            message: `You've earned ₦${bonusAmount} from your referral!`,
+            type: 'success',
+          })
+
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      case 'reject_referral': {
+        const { referral_id } = body
+
+        if (!referral_id) {
+          return new Response(JSON.stringify({ error: 'Missing referral_id' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        // Reset the referral to pending state
+        await supabaseAdmin
+          .from('referrals')
+          .update({
+            status: 'pending',
+            funding_amount: null,
+            funding_triggered_at: null,
+          })
+          .eq('id', referral_id)
+
+        return new Response(JSON.stringify({ success: true }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })

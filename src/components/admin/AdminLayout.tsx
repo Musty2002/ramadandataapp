@@ -10,7 +10,8 @@ import {
   Menu,
   X,
   Settings,
-  Bell
+  Bell,
+  Gift
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,6 +28,7 @@ const navItems = [
   { href: '/admin/transactions', icon: Receipt, label: 'Transactions' },
   { href: '/admin/data-plans', icon: Database, label: 'Data Plans' },
   { href: '/admin/airtime-plans', icon: Phone, label: 'Airtime Plans' },
+  { href: '/admin/referrals', icon: Gift, label: 'Referrals' },
   { href: '/admin/notifications', icon: Bell, label: 'Notifications' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ];

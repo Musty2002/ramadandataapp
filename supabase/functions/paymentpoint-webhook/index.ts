@@ -258,6 +258,116 @@ Deno.serve(async (req) => {
       console.log('No push tokens found for user:', profile.user_id)
     }
 
+    // === REFERRAL BONUS TRIGGER ===
+    // Check if this user was referred and if this deposit meets the threshold
+    try {
+      // Get referral settings
+      const { data: refSettings } = await supabase
+        .from('referral_settings')
+        .select('min_funding_amount, referrer_bonus, is_enabled, requires_approval')
+        .limit(1)
+        .single()
+
+      if (refSettings?.is_enabled) {
+        // Find the user's profile ID
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('id, referred_by')
+          .eq('user_id', profile.user_id)
+          .single()
+
+        if (userProfile?.referred_by) {
+          // Check if referral exists and hasn't been triggered yet
+          const { data: existingReferral } = await supabase
+            .from('referrals')
+            .select('id, funding_triggered_at, status')
+            .eq('referee_id', userProfile.id)
+            .maybeSingle()
+
+          // Only trigger if not already triggered and amount meets threshold
+          if (existingReferral && !existingReferral.funding_triggered_at && Number(amount) >= Number(refSettings.min_funding_amount)) {
+            console.log('Triggering referral bonus for:', existingReferral.id)
+
+            // Update referral with funding info
+            await supabase
+              .from('referrals')
+              .update({
+                funding_amount: amount,
+                funding_triggered_at: new Date().toISOString(),
+                status: 'completed',
+                referrer_bonus: refSettings.referrer_bonus,
+              })
+              .eq('id', existingReferral.id)
+
+            // If auto-approval is enabled (requires_approval = false), pay immediately
+            if (!refSettings.requires_approval) {
+              // Get referrer's user_id
+              const { data: referrerProfile } = await supabase
+                .from('profiles')
+                .select('user_id')
+                .eq('id', userProfile.referred_by)
+                .single()
+
+              if (referrerProfile) {
+                // Credit the referrer's wallet
+                const { data: referrerWallet } = await supabase
+                  .from('wallets')
+                  .select('balance')
+                  .eq('user_id', referrerProfile.user_id)
+                  .single()
+
+                const newReferrerBalance = Number(referrerWallet?.balance || 0) + Number(refSettings.referrer_bonus)
+
+                await supabase
+                  .from('wallets')
+                  .update({ balance: newReferrerBalance })
+                  .eq('user_id', referrerProfile.user_id)
+
+                // Create transaction
+                await supabase
+                  .from('transactions')
+                  .insert({
+                    user_id: referrerProfile.user_id,
+                    type: 'credit',
+                    category: 'referral_bonus',
+                    amount: refSettings.referrer_bonus,
+                    description: 'Referral bonus',
+                    status: 'completed',
+                    reference: `REF-BONUS-${existingReferral.id}`,
+                  })
+
+                // Update referral to paid
+                await supabase
+                  .from('referrals')
+                  .update({
+                    status: 'bonus_paid',
+                    bonus_paid_at: new Date().toISOString(),
+                  })
+                  .eq('id', existingReferral.id)
+
+                // Notify referrer
+                await supabase
+                  .from('notifications')
+                  .insert({
+                    user_id: referrerProfile.user_id,
+                    title: 'Referral Bonus Received! 🎉',
+                    message: `You've earned ₦${refSettings.referrer_bonus} from your referral!`,
+                    type: 'success',
+                  })
+
+                console.log('Auto-approved referral bonus paid:', existingReferral.id)
+              }
+            } else {
+              console.log('Referral marked for admin approval:', existingReferral.id)
+            }
+          }
+        }
+      }
+    } catch (refError) {
+      // Don't fail the webhook for referral errors - just log
+      console.error('Referral processing error (non-fatal):', refError)
+    }
+
     console.log('Payment processed successfully:', {
       user_id: profile.user_id,
       amount,
