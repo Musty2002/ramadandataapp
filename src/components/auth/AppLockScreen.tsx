@@ -6,6 +6,7 @@ import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { useToast } from '@/hooks/use-toast';
 import { verifyTransactionPin } from '@/components/auth/TransactionPinDialog';
 import { WhatsAppButton } from '@/components/dashboard/WhatsAppButton';
+import defaultAvatar from '@/assets/default-avatar.png';
 
 interface StoredUserCredentials {
   email: string;
@@ -122,9 +123,9 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
         {/* Avatar with golden ring */}
         <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-lg">
           <Avatar className="w-full h-full border-2 border-background">
-            <AvatarImage src={storedUser.avatarUrl} alt={storedUser.fullName} />
-            <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
-              {getInitials(storedUser.fullName)}
+            <AvatarImage src={storedUser.avatarUrl || defaultAvatar} alt={storedUser.fullName} />
+            <AvatarFallback className="bg-primary/10">
+              <img src={defaultAvatar} alt="Default avatar" className="w-full h-full object-cover" />
             </AvatarFallback>
           </Avatar>
         </div>
