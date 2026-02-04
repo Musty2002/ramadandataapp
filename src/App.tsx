@@ -14,6 +14,22 @@ import { useKeepAlive } from "@/hooks/useKeepAlive";
 import { useCapacitorNetworkSync } from "@/hooks/useCapacitorNetworkSync";
 import { isNativePlatform } from "@/hooks/usePlatform";
 
+// Check if we're in a development/preview environment (Lovable preview or localhost)
+function isPreviewEnvironment(): boolean {
+  const hostname = window.location.hostname.toLowerCase();
+  return (
+    hostname.includes('lovable.app') ||
+    hostname.includes('lovableproject.com') ||
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1'
+  );
+}
+
+// Allow access if native platform OR in preview/development environment
+function shouldAllowAccess(): boolean {
+  return isNativePlatform() || isPreviewEnvironment();
+}
+
 // Pages
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -78,8 +94,8 @@ function RootRedirect() {
   const hostname = window.location.hostname.toLowerCase();
   const isAdminHost = hostname === "admin.ramadandataapp.com.ng";
 
-  // Non-admin web users should be redirected to download app
-  if (!isAdminHost && !isNativePlatform()) {
+  // Non-admin web users should be redirected to download app (unless in preview)
+  if (!isAdminHost && !shouldAllowAccess()) {
     return <Navigate to="/download-app" replace />;
   }
 
@@ -89,8 +105,8 @@ function RootRedirect() {
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  // Block web access for security - redirect to download app page
-  if (!isNativePlatform()) {
+  // Block web access for security - redirect to download app page (unless in preview)
+  if (!shouldAllowAccess()) {
     return <Navigate to="/download-app" replace />;
   }
 
@@ -113,8 +129,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  // Block web access for security - redirect to download app page
-  if (!isNativePlatform()) {
+  // Block web access for security - redirect to download app page (unless in preview)
+  if (!shouldAllowAccess()) {
     return <Navigate to="/download-app" replace />;
   }
 
