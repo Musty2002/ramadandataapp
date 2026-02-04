@@ -90,12 +90,17 @@ export default function Dashboard() {
         <div className="safe-area-top">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4">
-            <Avatar className="h-10 w-10 cursor-pointer" onClick={() => navigate('/profile')}>
-              <AvatarImage src={profile?.avatar_url || undefined} />
-              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-                {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
-              </AvatarFallback>
-            </Avatar>
+            <div 
+              className="h-11 w-11 rounded-full p-0.5 bg-gradient-to-br from-primary via-primary/80 to-primary/60 cursor-pointer shadow-md"
+              onClick={() => navigate('/profile')}
+            >
+              <Avatar className="h-full w-full border-2 border-background">
+                <AvatarImage src={profile?.avatar_url || undefined} />
+                <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
+                  {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                </AvatarFallback>
+              </Avatar>
+            </div>
             <h1 className="text-lg font-bold text-primary">Ramadan Data App</h1>
             <button 
               onClick={() => navigate('/notifications')}
