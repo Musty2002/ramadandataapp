@@ -16,6 +16,7 @@ import { useConnectionTimeout } from '@/hooks/useConnectionTimeout';
 import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
 import logo from '@/assets/ramadan-logo.jpeg';
 import { useDocumentVisibility } from '@/hooks/useDocumentVisibility';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -89,7 +90,12 @@ export default function Dashboard() {
         <div className="safe-area-top">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4">
-            <img src={logo} alt="Ramadan Data App" className="h-10 w-10 rounded-full object-cover" />
+            <Avatar className="h-10 w-10 cursor-pointer" onClick={() => navigate('/profile')}>
+              <AvatarImage src={profile?.avatar_url || undefined} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+              </AvatarFallback>
+            </Avatar>
             <h1 className="text-lg font-bold text-primary">Ramadan Data App</h1>
             <button 
               onClick={() => navigate('/notifications')}
