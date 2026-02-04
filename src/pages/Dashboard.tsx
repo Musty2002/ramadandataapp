@@ -17,6 +17,7 @@ import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
 import logo from '@/assets/ramadan-logo.jpeg';
 import { useDocumentVisibility } from '@/hooks/useDocumentVisibility';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import defaultAvatar from '@/assets/default-avatar.png';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -95,9 +96,9 @@ export default function Dashboard() {
               onClick={() => navigate('/profile')}
             >
               <Avatar className="h-full w-full border-2 border-background">
-                <AvatarImage src={profile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary/10 text-primary text-sm font-semibold">
-                  {profile?.full_name ? profile.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                <AvatarImage src={profile?.avatar_url || defaultAvatar} />
+                <AvatarFallback className="bg-primary/10">
+                  <img src={defaultAvatar} alt="Avatar" className="h-full w-full object-cover" />
                 </AvatarFallback>
               </Avatar>
             </div>
