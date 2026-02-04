@@ -119,13 +119,15 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
     <div className="min-h-[100dvh] flex flex-col bg-secondary/30">
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-start pt-16 px-6">
-        {/* Avatar */}
-        <Avatar className="w-24 h-24 border-4 border-primary shadow-lg">
-          <AvatarImage src={storedUser.avatarUrl} alt={storedUser.fullName} />
-          <AvatarFallback className="bg-primary text-primary-foreground text-2xl font-bold">
-            {getInitials(storedUser.fullName)}
-          </AvatarFallback>
-        </Avatar>
+        {/* Avatar with golden ring */}
+        <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-lg">
+          <Avatar className="w-full h-full border-2 border-background">
+            <AvatarImage src={storedUser.avatarUrl} alt={storedUser.fullName} />
+            <AvatarFallback className="bg-primary/10 text-primary text-2xl font-bold">
+              {getInitials(storedUser.fullName)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
 
         {/* Welcome Text */}
         <h1 className="text-2xl font-bold mt-6 text-foreground">Welcome Back</h1>
