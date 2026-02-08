@@ -199,23 +199,24 @@ export function AccountCard() {
   const displayName = profile?.full_name || 'User';
 
   return (
-    <div className="gradient-primary rounded-2xl p-5 text-primary-foreground mx-4 shadow-lg">
+    <div className="gradient-primary rounded-2xl p-4 sm:p-5 text-primary-foreground mx-4 shadow-lg">
       {/* Greeting & Name */}
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <p className="text-sm opacity-80">Hello,</p>
-        <h2 className="text-xl font-semibold">{displayName}</h2>
+        <h2 className="text-lg sm:text-xl font-semibold truncate">{displayName}</h2>
       </div>
 
       {/* Balance Section */}
-      <div className="mb-4">
+      <div className="mb-3 sm:mb-4">
         <p className="text-xs opacity-70 mb-1">Available Balance</p>
         <div className="flex items-center gap-2">
-          <span className="text-3xl font-bold">
+          <span className="text-2xl sm:text-3xl font-bold">
             {showBalance ? formatBalance(liveBalance) : '₦ ****'}
           </span>
           <button
             onClick={() => setShowBalance(!showBalance)}
             className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
+            aria-label={showBalance ? 'Hide balance' : 'Show balance'}
           >
             {showBalance ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>

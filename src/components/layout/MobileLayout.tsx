@@ -195,8 +195,8 @@ export function MobileLayout({ children, showNav = true }: MobileLayoutProps) {
   }, []);
 
   return (
-    <div className="w-full max-w-md mx-auto bg-background flex flex-col min-h-[var(--app-height)]">
-      <main className={`flex-1 ${showNav ? 'pb-20' : ''}`}>
+    <div className="w-full max-w-md mx-auto bg-background flex flex-col min-h-[var(--app-height)] overflow-x-hidden">
+      <main className={`flex-1 overflow-y-auto overflow-x-hidden ${showNav ? 'pb-20' : ''}`}>
         {children}
       </main>
       {showNav && <BottomNav />}

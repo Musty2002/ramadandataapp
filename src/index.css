@@ -117,11 +117,18 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     background: var(--gradient-bg);
+    /* Prevent text size adjustment on orientation change */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Prevent overscroll bounce on Android/iOS */
+    overscroll-behavior: none;
   }
 
   /* Mobile app styling */
   html {
     -webkit-tap-highlight-color: transparent;
+    /* Prevent horizontal overflow on small screens */
+    overflow-x: hidden;
   }
 
   /* Ensure the app can correctly size itself to the viewport */
@@ -129,6 +136,9 @@
   body,
   #root {
     height: 100%;
+    /* Prevent content from exceeding screen width on small devices */
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
@@ -167,6 +177,32 @@
   display: none !important;
 }
 
+/* Small screen adjustments (320px and below - e.g. Galaxy J2, older budget phones) */
+@media (max-width: 320px) {
+  .text-3xl {
+    font-size: 1.5rem;
+    line-height: 2rem;
+  }
+  .text-2xl {
+    font-size: 1.25rem;
+    line-height: 1.75rem;
+  }
+  .px-4 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  .gap-4 {
+    gap: 0.75rem;
+  }
+}
+
+/* Prevent text truncation issues on small screens */
+@media (max-width: 360px) {
+  .truncate {
+    max-width: 100%;
+  }
+}
+
 /* Shake animation for PIN inputs */
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
@@ -177,4 +213,12 @@
 
 .animate-shake {
   animation: shake 0.4s ease-in-out;
+}
+
+/* Prevent WebView crashes from large paint operations */
+.gradient-primary,
+.gradient-accent {
+  will-change: auto;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }

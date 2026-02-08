@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { FloatingWhatsApp } from '@/components/website/FloatingWhatsApp';
-import logo from '@/assets/ramadan-logo.jpeg';
+import logo from '@/assets/logo.jpeg';
 import { z } from 'zod';
 
 const deleteRequestSchema = z.object({
@@ -191,9 +191,14 @@ export default function DeleteAccount() {
       {/* Footer */}
       <footer className="py-8 px-4 border-t border-border bg-card">
         <div className="max-w-2xl mx-auto text-center space-y-2">
-          <a href="/privacy-policy" className="text-sm text-primary hover:underline">
-            Privacy Policy
-          </a>
+          <div className="flex gap-4 justify-center">
+            <a href="/privacy-policy" className="text-sm text-primary hover:underline">
+              Privacy Policy
+            </a>
+            <a href="/terms-of-service" className="text-sm text-primary hover:underline">
+              Terms of Service
+            </a>
+          </div>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Ramadan Data App. All rights reserved.
           </p>
