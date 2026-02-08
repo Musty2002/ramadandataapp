@@ -248,6 +248,7 @@ export default function Website() {
                 <li><a href="#services" className="text-muted-foreground hover:text-primary transition-colors">Services</a></li>
                 <li><a href="#features" className="text-muted-foreground hover:text-primary transition-colors">Why Choose Us</a></li>
                 <li><Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
                 <li><Link to="/delete-account" className="text-muted-foreground hover:text-primary transition-colors">Delete Account</Link></li>
               </ul>
             </div>
@@ -305,6 +306,7 @@ export default function Website() {
             </p>
             <div className="flex gap-4 text-sm">
               <Link to="/privacy-policy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link>
+              <Link to="/terms-of-service" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link>
               <Link to="/delete-account" className="text-muted-foreground hover:text-primary transition-colors">Delete Account</Link>
             </div>
           </div>

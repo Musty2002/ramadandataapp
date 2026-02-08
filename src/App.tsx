@@ -13,6 +13,7 @@ import { useNativeFeatures } from "@/hooks/useNativeFeatures";
 import { useKeepAlive } from "@/hooks/useKeepAlive";
 import { useCapacitorNetworkSync } from "@/hooks/useCapacitorNetworkSync";
 import { isNativePlatform } from "@/hooks/usePlatform";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Check if we're in a development/preview environment (Lovable preview or localhost)
 function isPreviewEnvironment(): boolean {
@@ -51,6 +52,7 @@ import BvnNin from "./pages/BvnNin";
 import Notifications from "./pages/Notifications";
 import Website from "./pages/Website";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 import DeleteAccount from "./pages/DeleteAccount";
 import NotFound from "./pages/NotFound";
 import ExamPins from "./pages/ExamPins";
@@ -156,6 +158,7 @@ function AppRoutes() {
       <Route path="/download-app" element={<DownloadApp />} />
       <Route path="/website" element={<Website />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+      <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/delete-account" element={<DeleteAccount />} />
       <Route
         path="/auth"
@@ -354,25 +357,27 @@ const App = () => {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        {showSplash && !isAdminRoute && (
-          <SplashScreen onComplete={markReady} minDisplayTime={4000} />
-        )}
-        <BrowserRouter>
-          <AuthProvider>
-            <NativeWrapper>
-              <PushNotificationProvider>
-                <NetworkStatusIndicator />
-                <AppRoutes />
-              </PushNotificationProvider>
-            </NativeWrapper>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          {showSplash && !isAdminRoute && (
+            <SplashScreen onComplete={markReady} minDisplayTime={4000} />
+          )}
+          <BrowserRouter>
+            <AuthProvider>
+              <NativeWrapper>
+                <PushNotificationProvider>
+                  <NetworkStatusIndicator />
+                  <AppRoutes />
+                </PushNotificationProvider>
+              </NativeWrapper>
+            </AuthProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 
