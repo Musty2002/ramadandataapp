@@ -1,7 +1,7 @@
 import { ArrowLeft, Mail, Phone } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { FloatingWhatsApp } from '@/components/website/FloatingWhatsApp';
-import logo from '@/assets/logo.jpeg';
+import logo from '@/assets/ramadan-logo.jpeg';
 
 export default function TermsOfService() {
   const navigate = useNavigate();
