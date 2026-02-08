@@ -345,8 +345,9 @@ function NativeWrapper({ children }: { children: React.ReactNode }) {
 const App = () => {
   const { showSplash, hasCheckedStorage, markReady } = useAppReady();
   
-  // Skip splash screen for admin routes
-  const isAdminRoute = window.location.pathname.startsWith('/admin');
+  // Skip splash screen for admin routes and public web pages
+  const publicWebPages = ['/admin', '/privacy-policy', '/terms-of-service', '/delete-account', '/website', '/download-app'];
+  const isPublicPage = publicWebPages.some(path => window.location.pathname.startsWith(path));
 
   // Don't render anything until we've checked storage
   // This prevents flash of content before splash on native
@@ -362,7 +363,7 @@ const App = () => {
         <TooltipProvider>
           <Toaster />
           <Sonner />
-          {showSplash && !isAdminRoute && (
+          {showSplash && !isPublicPage && (
             <SplashScreen onComplete={markReady} minDisplayTime={4000} />
           )}
           <BrowserRouter>
