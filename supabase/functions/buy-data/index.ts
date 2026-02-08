@@ -382,7 +382,7 @@ async function callIsquareDataAPI(plan: any, phoneNumber: string, reference: str
       ? (data as any).plan.join(', ')
       : undefined
 
-    if (!response.ok || data.error || data.status === 'error' || validationPlanError) {
+    if (!response.ok || data.error || data.status === 'error' || data.status === 'fail' || data.status === 'failed' || validationPlanError) {
       return { 
         error: data.message || data.error || validationPlanError || 'iSquare API error',
         raw: data
@@ -448,7 +448,7 @@ async function callRgcDataAPI(plan: any, phoneNumber: string, reference: string)
     })()
     console.log('RGC API response:', data)
 
-    if (!response.ok || data.error || data.status === 'error') {
+    if (!response.ok || data.error || data.status === 'error' || data.status === 'fail' || data.status === 'failed') {
       return { 
         error: data.message || data.error || 'RGC API error',
         raw: data
@@ -567,10 +567,10 @@ async function callAlbarkaDataAPI(plan: any, phoneNumber: string, reference: str
       return { error: 'Invalid response from Albarka data endpoint', raw: responseText.substring(0, 200) }
     }
 
-    // Check for failure
-    if (data.status === 'failed' || data.Status === 'failed' || data.error) {
+    // Check for failure — Albarka may return 'fail' or 'failed'
+    if (data.status === 'failed' || data.status === 'fail' || data.Status === 'failed' || data.Status === 'fail' || data.error) {
       return { 
-        error: data.message || data.api_response || data.error || 'Albarka API error',
+        error: data.message || data.response || data.api_response || data.error || 'Albarka API error',
         raw: data
       }
     }

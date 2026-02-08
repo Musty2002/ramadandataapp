@@ -147,6 +147,16 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Create admin client for status updates (RLS blocks user updates on transactions)
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+
+    const baseTxMetadata = transaction.metadata && typeof transaction.metadata === 'object' && !Array.isArray(transaction.metadata)
+      ? (transaction.metadata as Record<string, unknown>)
+      : {}
+
     // Call the appropriate airtime API based on best provider
     let apiResponse
     if (selectedProvider === 'rgc') {
@@ -160,21 +170,21 @@ Deno.serve(async (req) => {
     if (apiResponse?.error) {
       console.error('API error:', apiResponse.error)
 
-      // Update transaction as failed
-      await supabase
+      // Update transaction as failed using admin client
+      await adminSupabase
         .from('transactions')
         .update({ 
           status: 'failed',
           metadata: {
-            ...transaction.metadata,
+            ...baseTxMetadata,
             api_error: apiResponse.error,
             api_response: apiResponse
           }
         })
         .eq('id', transaction.id)
 
-      // Create failure notification
-      await supabase.from('notifications').insert({
+      // Create failure notification using admin client
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Airtime Purchase Failed',
         message: `Failed to recharge ${cleanPhone} with ₦${amount}. ${apiResponse.error}`,
@@ -201,29 +211,30 @@ Deno.serve(async (req) => {
       console.error('Wallet debit error:', debitError)
     }
 
-    // Update transaction
-    const finalStatus = apiResponse?.status === 'success' ? 'success' : 'pending'
-    await supabase
+    // Update transaction with API response using admin client
+    // Map 'success' to 'completed' (valid DB enum: pending | completed | failed)
+    const finalStatus = apiResponse?.status === 'success' ? 'completed' : 'pending'
+    await adminSupabase
       .from('transactions')
       .update({ 
         status: finalStatus,
         metadata: {
-          ...transaction.metadata,
+          ...baseTxMetadata,
           api_response: apiResponse
         }
       })
       .eq('id', transaction.id)
 
-    // Create notification
-    if (finalStatus === 'success') {
-      await supabase.from('notifications').insert({
+    // Create notification using admin client
+    if (finalStatus === 'completed') {
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Airtime Purchase Successful',
         message: `₦${amount} airtime sent to ${cleanPhone}${discountAmount > 0 ? `. You saved ₦${discountAmount}!` : ''}`,
         type: 'success'
       })
     } else {
-      await supabase.from('notifications').insert({
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Airtime Purchase Processing',
         message: `Your ₦${amount} airtime recharge for ${cleanPhone} is being processed`,
