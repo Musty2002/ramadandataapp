@@ -152,19 +152,19 @@
   }
 
   .safe-area-top {
-    padding-top: env(safe-area-inset-top, 0);
+    padding-top: env(safe-area-inset-top, 0px);
   }
 
   .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .native-safe-top {
-    padding-top: max(env(safe-area-inset-top), 20px);
+    padding-top: max(env(safe-area-inset-top, 0px), 20px);
   }
 
   .native-safe-bottom {
-    padding-bottom: max(env(safe-area-inset-bottom), 34px);
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 34px);
   }
 }
 

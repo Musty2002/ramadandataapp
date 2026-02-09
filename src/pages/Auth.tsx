@@ -447,7 +447,7 @@ export default function Auth() {
   // Show loading state while checking PIN login availability
   if (!pinLoginChecked) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-pulse text-primary">Loading...</div>
       </div>
     );
@@ -466,7 +466,7 @@ export default function Auth() {
   // Forgot password modal/view with OTP flow
   if (showForgotPassword) {
     return (
-      <div className="min-h-[100dvh] overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-background">
+      <div className="min-h-screen overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] bg-background">
         <div className="mb-4 sm:mb-8 text-center mt-6 sm:mt-0">
           <img src={logo} alt="Ramadan Data App" className="w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl shadow-lg mb-2 sm:mb-4" />
           <h1 className="text-xl sm:text-2xl font-bold text-primary">Reset Password</h1>
@@ -637,7 +637,7 @@ export default function Auth() {
   const showBiometricLoginButton = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials && !showPinLogin;
 
   return (
-    <div className="min-h-[100dvh] overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-background">
+    <div className="min-h-screen overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] bg-background">
       {/* Logo */}
       <div className="mb-4 sm:mb-8 text-center mt-6 sm:mt-0">
         <img src={logo} alt="Ramadan Data App" className="w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl shadow-lg mb-2 sm:mb-4" />
