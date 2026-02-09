@@ -189,11 +189,11 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-secondary/30">
+    <div className="min-h-[100dvh] flex flex-col bg-secondary/30 overflow-y-auto">
       {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-start pt-16 px-6">
+      <div className="flex-1 flex flex-col items-center justify-start pt-8 sm:pt-16 px-4 sm:px-6">
         {/* Avatar with golden ring */}
-        <div className="w-28 h-28 rounded-full p-1 bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-lg">
+        <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full p-1 bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-lg">
           <Avatar className="w-full h-full border-2 border-background">
             <AvatarImage src={storedUser.avatarUrl || defaultAvatar} alt={storedUser.fullName} />
             <AvatarFallback className="bg-primary/10">
@@ -203,15 +203,15 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
         </div>
 
         {/* Welcome Text */}
-        <h1 className="text-2xl font-bold mt-6 text-foreground">Welcome Back</h1>
-        <p className="text-muted-foreground mt-1">{storedUser.fullName}</p>
+        <h1 className="text-xl sm:text-2xl font-bold mt-4 sm:mt-6 text-foreground">Welcome Back</h1>
+        <p className="text-muted-foreground text-sm mt-1">{storedUser.fullName}</p>
 
         {/* PIN Dots */}
-        <div className={`flex justify-center gap-4 mt-8 ${shake ? 'animate-shake' : ''}`}>
+        <div className={`flex justify-center gap-3 sm:gap-4 mt-5 sm:mt-8 ${shake ? 'animate-shake' : ''}`}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <div
               key={i}
-              className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
+              className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 transition-all duration-200 ${
                 i < pin.length
                   ? 'bg-primary border-primary scale-110'
                   : 'border-muted-foreground/40 bg-transparent'
@@ -222,24 +222,24 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
 
         {/* Error Message */}
         {error && (
-          <p className="text-destructive text-sm mt-4">{error}</p>
+          <p className="text-destructive text-sm mt-3">{error}</p>
         )}
 
         {/* Loading Indicator */}
         {loading && (
-          <div className="mt-4">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <div className="mt-3">
+            <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-primary" />
           </div>
         )}
 
         {/* Number Pad */}
-        <div className="grid grid-cols-3 gap-4 mt-8 max-w-[280px] w-full">
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mt-5 sm:mt-8 max-w-[220px] sm:max-w-[280px] w-full">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
             <Button
               key={digit}
               variant="secondary"
               size="lg"
-              className="h-16 w-16 mx-auto text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
+              className="h-13 w-13 sm:h-16 sm:w-16 mx-auto text-xl sm:text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
               onClick={() => handleDigit(String(digit))}
               disabled={loading}
             >
@@ -251,14 +251,14 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
           <Button
             variant="secondary"
             size="lg"
-            className="h-16 w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
+            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
             onClick={handleBiometricLogin}
             disabled={!showBiometricOption || biometricLoading || loading}
           >
             {biometricLoading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
             ) : (
-              <Fingerprint className={`w-6 h-6 ${showBiometricOption ? 'text-primary' : 'text-muted-foreground/40'}`} />
+              <Fingerprint className={`w-5 h-5 sm:w-6 sm:h-6 ${showBiometricOption ? 'text-primary' : 'text-muted-foreground/40'}`} />
             )}
           </Button>
 
@@ -266,7 +266,7 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
           <Button
             variant="secondary"
             size="lg"
-            className="h-16 w-16 mx-auto text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
+            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto text-xl sm:text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
             onClick={() => handleDigit('0')}
             disabled={loading}
           >
@@ -277,18 +277,18 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
           <Button
             variant="secondary"
             size="lg"
-            className="h-16 w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
+            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
             onClick={handleDelete}
             disabled={pin.length === 0 || loading}
           >
-            <Delete className="w-6 h-6" />
+            <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
           </Button>
         </div>
 
         {/* Forgot PIN */}
         <button
           onClick={handleForgotPin}
-          className="text-foreground font-medium mt-8 underline underline-offset-2"
+          className="text-foreground font-medium text-sm mt-5 sm:mt-8 underline underline-offset-2"
           disabled={loading}
         >
           Forgot PIN?
@@ -296,7 +296,7 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
       </div>
 
       {/* Bottom Actions */}
-      <div className="pb-8 px-6 flex justify-between items-center">
+      <div className="pb-6 sm:pb-8 px-4 sm:px-6 flex justify-between items-center">
         <Button
           variant="ghost"
           size="icon"
