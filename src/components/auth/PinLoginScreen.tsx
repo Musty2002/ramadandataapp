@@ -189,7 +189,7 @@ export function PinLoginScreen({ onSwitchToPassword, storedUser }: PinLoginScree
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-secondary/30 overflow-y-auto">
+    <div className="min-h-screen flex flex-col bg-secondary/30 overflow-y-auto">
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-start pt-8 sm:pt-16 px-4 sm:px-6">
         {/* Avatar with golden ring */}
