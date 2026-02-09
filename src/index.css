@@ -177,8 +177,8 @@
   display: none !important;
 }
 
-/* Small screen adjustments (320px and below - e.g. Galaxy J2, older budget phones) */
-@media (max-width: 320px) {
+/* Small screen adjustments (360px and below - budget Android phones) */
+@media (max-width: 360px) {
   .text-3xl {
     font-size: 1.5rem;
     line-height: 2rem;
@@ -187,19 +187,57 @@
     font-size: 1.25rem;
     line-height: 1.75rem;
   }
-  .px-4 {
-    padding-left: 0.75rem;
-    padding-right: 0.75rem;
+  .text-xl {
+    font-size: 1.1rem;
+    line-height: 1.5rem;
   }
-  .gap-4 {
-    gap: 0.75rem;
+  .truncate {
+    max-width: 100%;
   }
 }
 
-/* Prevent text truncation issues on small screens */
-@media (max-width: 360px) {
-  .truncate {
-    max-width: 100%;
+/* Very small screens (320px and below - e.g. Galaxy J2) */
+@media (max-width: 320px) {
+  .text-3xl {
+    font-size: 1.35rem;
+    line-height: 1.85rem;
+  }
+  .text-2xl {
+    font-size: 1.15rem;
+    line-height: 1.6rem;
+  }
+  .text-xl {
+    font-size: 1rem;
+    line-height: 1.4rem;
+  }
+  .text-lg {
+    font-size: 0.95rem;
+    line-height: 1.35rem;
+  }
+  .px-4 {
+    padding-left: 0.65rem;
+    padding-right: 0.65rem;
+  }
+  .py-4 {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+  .gap-4 {
+    gap: 0.65rem;
+  }
+  .gap-3 {
+    gap: 0.5rem;
+  }
+  .p-6 {
+    padding: 0.875rem;
+  }
+  .p-4 {
+    padding: 0.65rem;
+  }
+  .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(0.65rem * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(0.65rem * var(--tw-space-y-reverse));
   }
 }
 

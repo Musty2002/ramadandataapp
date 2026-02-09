@@ -466,10 +466,10 @@ export default function Auth() {
   // Forgot password modal/view with OTP flow
   if (showForgotPassword) {
     return (
-      <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
-        <div className="mb-8 text-center">
-          <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
-          <h1 className="text-2xl font-bold text-primary">Reset Password</h1>
+      <div className="min-h-[100dvh] overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-background">
+        <div className="mb-4 sm:mb-8 text-center mt-6 sm:mt-0">
+          <img src={logo} alt="Ramadan Data App" className="w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl shadow-lg mb-2 sm:mb-4" />
+          <h1 className="text-xl sm:text-2xl font-bold text-primary">Reset Password</h1>
           <p className="text-muted-foreground text-sm mt-1">
             {resetStep === 'email' && 'Enter your email to receive a code'}
             {resetStep === 'otp' && 'Enter the 6-digit code sent to your email'}
@@ -637,12 +637,12 @@ export default function Auth() {
   const showBiometricLoginButton = isLogin && biometricAvailable && biometricEnabled && storedCreds?.hasCredentials && !showPinLogin;
 
   return (
-    <div className="min-h-[100dvh] max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-6 py-12 pb-[calc(6rem+env(safe-area-inset-bottom))] bg-background">
+    <div className="min-h-[100dvh] overflow-y-auto flex flex-col items-center justify-start px-4 sm:px-6 py-6 sm:py-12 pb-[calc(4rem+env(safe-area-inset-bottom))] bg-background">
       {/* Logo */}
-      <div className="mb-8 text-center">
-        <img src={logo} alt="Ramadan Data App" className="w-20 h-20 mx-auto rounded-2xl shadow-lg mb-4" />
-        <h1 className="text-2xl font-bold text-primary">Ramadan Data App</h1>
-        <p className="text-muted-foreground text-sm mt-1">Your trusted payment partner</p>
+      <div className="mb-4 sm:mb-8 text-center mt-6 sm:mt-0">
+        <img src={logo} alt="Ramadan Data App" className="w-14 h-14 sm:w-20 sm:h-20 mx-auto rounded-2xl shadow-lg mb-2 sm:mb-4" />
+        <h1 className="text-xl sm:text-2xl font-bold text-primary">Ramadan Data App</h1>
+        <p className="text-muted-foreground text-xs sm:text-sm mt-1">Your trusted payment partner</p>
       </div>
 
       {/* Biometric Quick Login (only when PIN not available) */}
@@ -678,7 +678,7 @@ export default function Auth() {
       )}
 
       {/* Form Card */}
-      <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg p-6">
+      <div className="w-full max-w-sm bg-card rounded-2xl shadow-lg p-4 sm:p-6">
         <div className="flex mb-6">
           <button
             onClick={() => setIsLogin(true)}
