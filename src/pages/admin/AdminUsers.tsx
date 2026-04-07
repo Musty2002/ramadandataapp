@@ -233,25 +233,46 @@ export default function AdminUsers() {
                       </TableRow>
                     ) : (
                       filteredUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableRow key={user.id} className={user.is_blocked ? 'opacity-60 bg-destructive/5' : ''}>
+                          <TableCell className="font-medium">
+                            {user.full_name}
+                            {user.is_blocked && (
+                              <span className="ml-2 text-xs text-destructive font-semibold">BLOCKED</span>
+                            )}
+                          </TableCell>
                           <TableCell>{user.email || '-'}</TableCell>
                           <TableCell>{user.phone}</TableCell>
                           <TableCell>{user.account_number}</TableCell>
                           <TableCell>₦{Number(user.wallet_balance).toLocaleString()}</TableCell>
                           <TableCell>{format(new Date(user.created_at), 'MMM d, yyyy')}</TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setFundDialogOpen(true);
-                              }}
-                            >
-                              <Wallet className="h-4 w-4 mr-1" />
-                              Fund
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setFundDialogOpen(true);
+                                }}
+                              >
+                                <Wallet className="h-4 w-4 mr-1" />
+                                Fund
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={user.is_blocked ? 'outline' : 'destructive'}
+                                disabled={blockingUserId === user.user_id}
+                                onClick={() => handleToggleBlock(user)}
+                              >
+                                {blockingUserId === user.user_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : user.is_blocked ? (
+                                  <><CheckCircle className="h-4 w-4 mr-1" /> Unblock</>
+                                ) : (
+                                  <><Ban className="h-4 w-4 mr-1" /> Block</>
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
