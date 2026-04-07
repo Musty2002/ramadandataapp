@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Wallet, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Wallet, Loader2, RefreshCw, Ban, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface User {
