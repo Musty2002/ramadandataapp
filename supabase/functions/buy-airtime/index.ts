@@ -311,9 +311,15 @@ async function callIsquareAirtimeAPI(network: string, phoneNumber: string, amoun
     const data = await response.json()
     console.log('iSquare Airtime API response:', data)
 
-    if (!response.ok || data.error || data.status === 'error') {
+    // iSquare returns errors in field arrays like { network: ["error message"] }
+    const fieldErrors = ['network', 'amount', 'phone_number'].reduce((acc: string[], field) => {
+      if (Array.isArray(data[field])) acc.push(...data[field])
+      return acc
+    }, [])
+
+    if (!response.ok || data.error || data.status === 'error' || fieldErrors.length > 0) {
       return { 
-        error: data.message || data.error || 'iSquare API error',
+        error: fieldErrors.length > 0 ? fieldErrors.join('; ') : (data.message || data.error || 'iSquare API error'),
         raw: data
       }
     }
