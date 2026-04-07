@@ -489,6 +489,36 @@ Deno.serve(async (req) => {
         })
       }
 
+      case 'toggle-block-user': {
+        if (req.method !== 'POST') {
+          return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+            status: 405,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const { user_id: blockUserId, is_blocked } = body
+
+        if (!blockUserId || typeof is_blocked !== 'boolean') {
+          return new Response(JSON.stringify({ error: 'Invalid request' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          })
+        }
+
+        const { error: blockError } = await supabaseAdmin
+          .from('profiles')
+          .update({ is_blocked })
+          .eq('user_id', blockUserId)
+
+        if (blockError) throw blockError
+
+        return new Response(JSON.stringify({ success: true, is_blocked }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
       default:
         return new Response(JSON.stringify({ error: 'Invalid action' }), {
           status: 400,

@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Search, Wallet, Loader2, RefreshCw } from 'lucide-react';
+import { Search, Wallet, Loader2, RefreshCw, Ban, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface User {
@@ -20,6 +20,7 @@ interface User {
   account_number: string;
   created_at: string;
   wallet_balance?: number;
+  is_blocked?: boolean;
 }
 
 export default function AdminUsers() {
@@ -31,6 +32,7 @@ export default function AdminUsers() {
   const [fundDescription, setFundDescription] = useState('');
   const [fundDialogOpen, setFundDialogOpen] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
@@ -133,6 +135,41 @@ export default function AdminUsers() {
     }
   };
 
+  const handleToggleBlock = async (user: User) => {
+    const newBlocked = !user.is_blocked;
+    setBlockingUserId(user.user_id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data?action=toggle-block-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: user.user_id, is_blocked: newBlocked }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to update');
+
+      toast({
+        title: newBlocked ? 'User Blocked' : 'User Unblocked',
+        description: `${user.full_name} has been ${newBlocked ? 'blocked' : 'unblocked'}`,
+      });
+
+      setUsers(prev => prev.map(u => u.user_id === user.user_id ? { ...u, is_blocked: newBlocked } : u));
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setBlockingUserId(null);
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
     user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -196,25 +233,46 @@ export default function AdminUsers() {
                       </TableRow>
                     ) : (
                       filteredUsers.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.full_name}</TableCell>
+                        <TableRow key={user.id} className={user.is_blocked ? 'opacity-60 bg-destructive/5' : ''}>
+                          <TableCell className="font-medium">
+                            {user.full_name}
+                            {user.is_blocked && (
+                              <span className="ml-2 text-xs text-destructive font-semibold">BLOCKED</span>
+                            )}
+                          </TableCell>
                           <TableCell>{user.email || '-'}</TableCell>
                           <TableCell>{user.phone}</TableCell>
                           <TableCell>{user.account_number}</TableCell>
                           <TableCell>₦{Number(user.wallet_balance).toLocaleString()}</TableCell>
                           <TableCell>{format(new Date(user.created_at), 'MMM d, yyyy')}</TableCell>
                           <TableCell>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedUser(user);
-                                setFundDialogOpen(true);
-                              }}
-                            >
-                              <Wallet className="h-4 w-4 mr-1" />
-                              Fund
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setFundDialogOpen(true);
+                                }}
+                              >
+                                <Wallet className="h-4 w-4 mr-1" />
+                                Fund
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={user.is_blocked ? 'outline' : 'destructive'}
+                                disabled={blockingUserId === user.user_id}
+                                onClick={() => handleToggleBlock(user)}
+                              >
+                                {blockingUserId === user.user_id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : user.is_blocked ? (
+                                  <><CheckCircle className="h-4 w-4 mr-1" /> Unblock</>
+                                ) : (
+                                  <><Ban className="h-4 w-4 mr-1" /> Block</>
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))

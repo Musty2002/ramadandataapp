@@ -358,6 +358,7 @@ export type Database = {
           email: string | null
           full_name: string
           id: string
+          is_blocked: boolean
           phone: string
           referral_code: string
           referred_by: string | null
@@ -375,6 +376,7 @@ export type Database = {
           email?: string | null
           full_name: string
           id?: string
+          is_blocked?: boolean
           phone: string
           referral_code: string
           referred_by?: string | null
@@ -392,6 +394,7 @@ export type Database = {
           email?: string | null
           full_name?: string
           id?: string
+          is_blocked?: boolean
           phone?: string
           referral_code?: string
           referred_by?: string | null
