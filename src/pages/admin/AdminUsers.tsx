@@ -20,6 +20,7 @@ interface User {
   account_number: string;
   created_at: string;
   wallet_balance?: number;
+  is_blocked?: boolean;
 }
 
 export default function AdminUsers() {
