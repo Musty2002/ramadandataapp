@@ -169,7 +169,7 @@ export default function Airtime() {
     // Prevent duplicate submissions
     if (purchaseLockRef.current) return;
     const now = Date.now();
-    if (now - lastPurchaseTimeRef.current < 5000) {
+    if (now - lastPurchaseTimeRef.current < 60000) {
       toast({
         variant: 'destructive',
         title: 'Please Wait',
