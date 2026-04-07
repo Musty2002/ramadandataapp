@@ -135,6 +135,41 @@ export default function AdminUsers() {
     }
   };
 
+  const handleToggleBlock = async (user: User) => {
+    const newBlocked = !user.is_blocked;
+    setBlockingUserId(user.user_id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-data?action=toggle-block-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ user_id: user.user_id, is_blocked: newBlocked }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to update');
+
+      toast({
+        title: newBlocked ? 'User Blocked' : 'User Unblocked',
+        description: `${user.full_name} has been ${newBlocked ? 'blocked' : 'unblocked'}`,
+      });
+
+      setUsers(prev => prev.map(u => u.user_id === user.user_id ? { ...u, is_blocked: newBlocked } : u));
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error', description: error.message });
+    } finally {
+      setBlockingUserId(null);
+    }
+  };
+
   const filteredUsers = users.filter((user) =>
     user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
