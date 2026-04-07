@@ -275,6 +275,7 @@ export default function Airtime() {
       });
     } finally {
       setPurchasing(false);
+      purchaseLockRef.current = false;
     }
   };
 
