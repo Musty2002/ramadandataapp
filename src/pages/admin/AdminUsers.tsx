@@ -32,6 +32,7 @@ export default function AdminUsers() {
   const [fundDescription, setFundDescription] = useState('');
   const [fundDialogOpen, setFundDialogOpen] = useState(false);
   const [fundingLoading, setFundingLoading] = useState(false);
+  const [blockingUserId, setBlockingUserId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchUsers = async () => {
