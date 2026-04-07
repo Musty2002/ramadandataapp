@@ -162,7 +162,23 @@ export default function Airtime() {
     executePurchase();
   };
 
+  const purchaseLockRef = useRef(false);
+  const lastPurchaseTimeRef = useRef(0);
+
   const executePurchase = async () => {
+    // Prevent duplicate submissions
+    if (purchaseLockRef.current) return;
+    const now = Date.now();
+    if (now - lastPurchaseTimeRef.current < 5000) {
+      toast({
+        variant: 'destructive',
+        title: 'Please Wait',
+        description: 'Please wait a few seconds before trying again.',
+      });
+      return;
+    }
+    purchaseLockRef.current = true;
+    lastPurchaseTimeRef.current = now;
     setPurchasing(true);
     setPendingPurchase(false);
     
