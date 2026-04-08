@@ -45,6 +45,24 @@ Deno.serve(async (req) => {
 
     const userId = claimsData.claims.sub as string
 
+    // Check if user is blocked
+    const adminSupabaseCheck = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+    const { data: profile } = await adminSupabaseCheck
+      .from('profiles')
+      .select('is_blocked')
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (profile?.is_blocked) {
+      return new Response(JSON.stringify({ error: 'Your account has been suspended. Please contact support.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
     // Parse request body
     const { network, phone_number, amount }: BuyAirtimeRequest = await req.json()
 
