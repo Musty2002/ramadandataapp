@@ -187,7 +187,12 @@ Deno.serve(async (req) => {
         if (!response.ok || data.error || data.status === 'error') {
           if (pins.length === 0) {
             const errorMsg = data.message || data.error || 'Purchase failed'
-            await updateTransactionFailed(supabase, transaction.id, userId, errorMsg, examPin.name)
+            // Refund the full amount since no pins were purchased
+            await adminSupabase
+              .from('wallets')
+              .update({ balance: deductResult + totalPrice })
+              .eq('user_id', userId)
+            await updateTransactionFailed(adminSupabase, transaction.id, userId, errorMsg, examPin.name)
             return new Response(JSON.stringify({ error: errorMsg }), { 
               status: 400, 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -202,16 +207,21 @@ Deno.serve(async (req) => {
         })
       }
 
-      // Debit wallet for successful pins
+      // If partial success, refund the difference
       const actualCost = Number(examPin.price) * pins.length
-      const newBalance = Number(wallet.balance) - actualCost
-      await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', userId)
+      if (actualCost < totalPrice) {
+        const refundAmount = totalPrice - actualCost
+        await adminSupabase
+          .from('wallets')
+          .update({ balance: deductResult + refundAmount })
+          .eq('user_id', userId)
+      }
 
       // Update transaction with actual amount and pins
-      await supabase
+      await adminSupabase
         .from('transactions')
         .update({ 
-          status: 'success',
+          status: 'completed',
           amount: actualCost,
           metadata: {
             ...transaction.metadata,
@@ -222,7 +232,7 @@ Deno.serve(async (req) => {
         .eq('id', transaction.id)
 
       // Send notification
-      await supabase.from('notifications').insert({
+      await adminSupabase.from('notifications').insert({
         user_id: userId,
         title: 'Exam Pin Purchase Successful',
         message: `${pins.length}x ${examPin.name} purchased. Check transaction history for PIN(s).`,
