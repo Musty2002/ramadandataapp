@@ -245,6 +245,12 @@ Deno.serve(async (req) => {
       apiError = apiResponse.error
       console.error('API error:', apiError)
 
+      // Refund the wallet since the API call failed
+      await adminSupabase
+        .from('wallets')
+        .update({ balance: deductResult + sellingPrice })
+        .eq('user_id', userId)
+
       // Update transaction as failed using admin client
       const { error: updateError } = await adminSupabase
         .from('transactions')
@@ -279,17 +285,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Debit wallet
-    const newBalance = Number(wallet.balance) - sellingPrice
-    const { error: debitError } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('user_id', userId)
-
-    if (debitError) {
-      console.error('Wallet debit error:', debitError)
-      // Transaction stays pending, will be handled by webhook
-    }
+    // Wallet was already debited atomically before the API call
 
     // Update transaction with API response using admin client
     const finalStatus = apiResponse?.status === 'success' ? 'completed' : 'pending'
