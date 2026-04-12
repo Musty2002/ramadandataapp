@@ -216,6 +216,7 @@ export default function AdminTransactions() {
                       <TableHead>User</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>Recipient</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Status</TableHead>
