@@ -22,6 +22,7 @@ interface Transaction {
   status: string;
   reference: string | null;
   created_at: string;
+  metadata?: Record<string, any> | null;
   user_name?: string;
   user_email?: string;
 }
