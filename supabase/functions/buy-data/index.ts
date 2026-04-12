@@ -171,11 +171,7 @@ Deno.serve(async (req) => {
 
     const baseTxMetadata = asObject(transaction.metadata)
 
-    // Create admin client for status updates (RLS blocks user updates on transactions)
-    const adminSupabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    )
+    // adminSupabase already created above for atomic deduction
 
     // Call the API based on provider
     let apiResponse: any = null
