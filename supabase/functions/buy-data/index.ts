@@ -107,6 +107,8 @@ Deno.serve(async (req) => {
       })
     }
 
+    const sellingPrice = Number(plan.selling_price)
+
     // Atomically deduct wallet balance (prevents race conditions)
     const adminSupabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
