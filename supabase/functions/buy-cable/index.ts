@@ -222,6 +222,7 @@ async function handlePurchaseCable(req: Request, supabase: any, userId: string) 
     })
   }
 
+  const price = Number(bouquet.price)
   // Atomically deduct wallet balance (prevents race conditions)
   const adminSupabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
