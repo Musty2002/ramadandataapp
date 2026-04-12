@@ -149,11 +149,19 @@ export default function AdminTransactions() {
       : <Badge className="bg-red-500/10 text-red-600">Debit</Badge>;
   };
 
+  const getRecipientPhone = (tx: Transaction): string | null => {
+    if (tx.metadata?.phone_number) return tx.metadata.phone_number;
+    if (tx.metadata?.smart_card_number) return tx.metadata.smart_card_number;
+    if (tx.metadata?.meter_number) return tx.metadata.meter_number;
+    return null;
+  };
+
   const filteredTransactions = transactions.filter((tx) =>
     tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.category.toLowerCase().includes(searchQuery.toLowerCase())
+    tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (getRecipientPhone(tx) || '').includes(searchQuery)
   );
 
   return (
