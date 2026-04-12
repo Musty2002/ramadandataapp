@@ -187,6 +187,12 @@ Deno.serve(async (req) => {
     if (apiResponse?.error) {
       console.error('API error:', apiResponse.error)
 
+      // Refund the wallet since the API call failed
+      await adminSupabase
+        .from('wallets')
+        .update({ balance: deductResult + chargeAmount })
+        .eq('user_id', userId)
+
       // Update transaction as failed using admin client
       await adminSupabase
         .from('transactions')
