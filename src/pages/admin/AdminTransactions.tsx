@@ -22,6 +22,7 @@ interface Transaction {
   status: string;
   reference: string | null;
   created_at: string;
+  metadata?: Record<string, any> | null;
   user_name?: string;
   user_email?: string;
 }
@@ -148,11 +149,19 @@ export default function AdminTransactions() {
       : <Badge className="bg-red-500/10 text-red-600">Debit</Badge>;
   };
 
+  const getRecipientPhone = (tx: Transaction): string | null => {
+    if (tx.metadata?.phone_number) return tx.metadata.phone_number;
+    if (tx.metadata?.smart_card_number) return tx.metadata.smart_card_number;
+    if (tx.metadata?.meter_number) return tx.metadata.meter_number;
+    return null;
+  };
+
   const filteredTransactions = transactions.filter((tx) =>
     tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.user_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     tx.reference?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    tx.category.toLowerCase().includes(searchQuery.toLowerCase())
+    tx.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (getRecipientPhone(tx) || '').includes(searchQuery)
   );
 
   return (
@@ -207,6 +216,7 @@ export default function AdminTransactions() {
                       <TableHead>User</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>Recipient</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Status</TableHead>
@@ -217,7 +227,7 @@ export default function AdminTransactions() {
                   <TableBody>
                     {filteredTransactions.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                           No transactions found
                         </TableCell>
                       </TableRow>
@@ -232,6 +242,7 @@ export default function AdminTransactions() {
                           </TableCell>
                           <TableCell>{getTypeBadge(tx.type)}</TableCell>
                           <TableCell className="capitalize">{tx.category}</TableCell>
+                          <TableCell className="font-mono text-sm">{getRecipientPhone(tx) || '—'}</TableCell>
                           <TableCell className="font-medium">₦{tx.amount.toLocaleString()}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{tx.description}</TableCell>
                           <TableCell>{getStatusBadge(tx.status)}</TableCell>
