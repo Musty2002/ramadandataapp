@@ -217,25 +217,29 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
     })
   }
 
-  // Get user's wallet
-  const { data: wallet, error: walletError } = await supabase
-    .from('wallets')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle()
+  // Atomically deduct wallet balance (prevents race conditions)
+  const adminSupabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+  const { data: deductResult, error: deductError } = await adminSupabase
+    .rpc('deduct_wallet_balance', { p_user_id: userId, p_amount: amount })
 
-  if (walletError || !wallet) {
-    return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
-      status: 404, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
-  }
-
-  // Check balance
-  if (Number(wallet.balance) < amount) {
-    return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
-      status: 400, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+  if (deductError) {
+    const msg = deductError.message || ''
+    if (msg.includes('INSUFFICIENT_BALANCE')) {
+      return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
+    if (msg.includes('WALLET_NOT_FOUND')) {
+      return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
+    console.error('Wallet deduction error:', deductError)
+    return new Response(JSON.stringify({ error: 'Failed to process payment' }), { 
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }
 
