@@ -107,26 +107,25 @@ Deno.serve(async (req) => {
 
     console.log('Selected provider for airtime:', { provider: selectedProvider, discount: discountPercent })
 
-    // Get user's wallet
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
+    // Atomically deduct wallet balance (prevents race conditions)
+    const { data: deductResult, error: deductError } = await adminSupabaseCheck
+      .rpc('deduct_wallet_balance', { p_user_id: userId, p_amount: chargeAmount })
 
-    if (walletError || !wallet) {
-      console.error('Wallet lookup error:', walletError)
-      return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
-        status: 404, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
-    }
-
-    // Check sufficient balance
-    if (Number(wallet.balance) < chargeAmount) {
-      return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    if (deductError) {
+      const msg = deductError.message || ''
+      if (msg.includes('INSUFFICIENT_BALANCE')) {
+        return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      }
+      if (msg.includes('WALLET_NOT_FOUND')) {
+        return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      }
+      console.error('Wallet deduction error:', deductError)
+      return new Response(JSON.stringify({ error: 'Failed to process payment' }), { 
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
 
@@ -188,6 +187,12 @@ Deno.serve(async (req) => {
     if (apiResponse?.error) {
       console.error('API error:', apiResponse.error)
 
+      // Refund the wallet since the API call failed
+      await adminSupabase
+        .from('wallets')
+        .update({ balance: deductResult + chargeAmount })
+        .eq('user_id', userId)
+
       // Update transaction as failed using admin client
       await adminSupabase
         .from('transactions')
@@ -218,18 +223,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    // Debit wallet
-    const newBalance = Number(wallet.balance) - chargeAmount
-    const { error: debitError } = await supabase
-      .from('wallets')
-      .update({ balance: newBalance })
-      .eq('user_id', userId)
-
-    if (debitError) {
-      console.error('Wallet debit error:', debitError)
-    }
-
-    // Update transaction with API response using admin client
+    // Wallet was already debited atomically before the API call
     // Map 'success' to 'completed' (valid DB enum: pending | completed | failed)
     const finalStatus = apiResponse?.status === 'success' ? 'completed' : 'pending'
     await adminSupabase

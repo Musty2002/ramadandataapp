@@ -217,25 +217,29 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
     })
   }
 
-  // Get user's wallet
-  const { data: wallet, error: walletError } = await supabase
-    .from('wallets')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle()
+  // Atomically deduct wallet balance (prevents race conditions)
+  const adminSupabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+  const { data: deductResult, error: deductError } = await adminSupabase
+    .rpc('deduct_wallet_balance', { p_user_id: userId, p_amount: amount })
 
-  if (walletError || !wallet) {
-    return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
-      status: 404, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-    })
-  }
-
-  // Check balance
-  if (Number(wallet.balance) < amount) {
-    return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
-      status: 400, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+  if (deductError) {
+    const msg = deductError.message || ''
+    if (msg.includes('INSUFFICIENT_BALANCE')) {
+      return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
+    if (msg.includes('WALLET_NOT_FOUND')) {
+      return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
+        status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      })
+    }
+    console.error('Wallet deduction error:', deductError)
+    return new Response(JSON.stringify({ error: 'Failed to process payment' }), { 
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     })
   }
 
@@ -309,22 +313,25 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
 
     if (!response.ok || data.error || data.status === 'error') {
       const errorMsg = data.message || data.error || 'Purchase failed'
-      await updateTransactionFailed(supabase, transaction.id, userId, errorMsg, provider.name, cleanMeter)
+      // Refund the wallet since the API call failed
+      await adminSupabase
+        .from('wallets')
+        .update({ balance: deductResult + amount })
+        .eq('user_id', userId)
+      await updateTransactionFailed(adminSupabase, transaction.id, userId, errorMsg, provider.name, cleanMeter)
       return new Response(JSON.stringify({ error: errorMsg }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
 
-    // Debit wallet
-    const newBalance = Number(wallet.balance) - amount
-    await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', userId)
+    // Wallet was already debited atomically before the API call
 
     // Update transaction success
-    await supabase
+    await adminSupabase
       .from('transactions')
       .update({ 
-        status: 'success',
+        status: 'completed',
         metadata: {
           ...transaction.metadata,
           token: data.token || data.electricity_token,
@@ -335,7 +342,7 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
       .eq('id', transaction.id)
 
     // Send notification
-    await supabase.from('notifications').insert({
+    await adminSupabase.from('notifications').insert({
       user_id: userId,
       title: 'Electricity Purchase Successful',
       message: `Token: ${data.token || data.electricity_token || 'Check your meter'}. ₦${amount} for ${provider.name}`,

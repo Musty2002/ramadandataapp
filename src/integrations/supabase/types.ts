@@ -624,6 +624,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      deduct_wallet_balance: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
       generate_account_number: { Args: never; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
       has_role: {
