@@ -107,26 +107,25 @@ Deno.serve(async (req) => {
 
     console.log('Selected provider for airtime:', { provider: selectedProvider, discount: discountPercent })
 
-    // Get user's wallet
-    const { data: wallet, error: walletError } = await supabase
-      .from('wallets')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle()
+    // Atomically deduct wallet balance (prevents race conditions)
+    const { data: deductResult, error: deductError } = await adminSupabaseCheck
+      .rpc('deduct_wallet_balance', { p_user_id: userId, p_amount: chargeAmount })
 
-    if (walletError || !wallet) {
-      console.error('Wallet lookup error:', walletError)
-      return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
-        status: 404, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      })
-    }
-
-    // Check sufficient balance
-    if (Number(wallet.balance) < chargeAmount) {
-      return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
-        status: 400, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    if (deductError) {
+      const msg = deductError.message || ''
+      if (msg.includes('INSUFFICIENT_BALANCE')) {
+        return new Response(JSON.stringify({ error: 'Insufficient balance' }), { 
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      }
+      if (msg.includes('WALLET_NOT_FOUND')) {
+        return new Response(JSON.stringify({ error: 'Wallet not found' }), { 
+          status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+      }
+      console.error('Wallet deduction error:', deductError)
+      return new Response(JSON.stringify({ error: 'Failed to process payment' }), { 
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
 
