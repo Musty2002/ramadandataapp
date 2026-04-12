@@ -328,10 +328,10 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
     // Wallet was already debited atomically before the API call
 
     // Update transaction success
-    await supabase
+    await adminSupabase
       .from('transactions')
       .update({ 
-        status: 'success',
+        status: 'completed',
         metadata: {
           ...transaction.metadata,
           token: data.token || data.electricity_token,
@@ -342,7 +342,7 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
       .eq('id', transaction.id)
 
     // Send notification
-    await supabase.from('notifications').insert({
+    await adminSupabase.from('notifications').insert({
       user_id: userId,
       title: 'Electricity Purchase Successful',
       message: `Token: ${data.token || data.electricity_token || 'Check your meter'}. ₦${amount} for ${provider.name}`,

@@ -333,10 +333,10 @@ async function handlePurchaseCable(req: Request, supabase: any, userId: string) 
     // Wallet was already debited atomically before the API call
 
     // Update transaction success
-    await supabase
+    await adminSupabase
       .from('transactions')
       .update({ 
-        status: 'success',
+        status: 'completed',
         metadata: {
           ...transaction.metadata,
           api_response: data
@@ -345,7 +345,7 @@ async function handlePurchaseCable(req: Request, supabase: any, userId: string) 
       .eq('id', transaction.id)
 
     // Send notification
-    await supabase.from('notifications').insert({
+    await adminSupabase.from('notifications').insert({
       user_id: userId,
       title: 'Cable Subscription Successful',
       message: `${bouquet.name} subscription activated for ${provider.name} - ${cleanCard}`,
