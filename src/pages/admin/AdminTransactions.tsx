@@ -242,6 +242,7 @@ export default function AdminTransactions() {
                           </TableCell>
                           <TableCell>{getTypeBadge(tx.type)}</TableCell>
                           <TableCell className="capitalize">{tx.category}</TableCell>
+                          <TableCell className="font-mono text-sm">{getRecipientPhone(tx) || '—'}</TableCell>
                           <TableCell className="font-medium">₦{tx.amount.toLocaleString()}</TableCell>
                           <TableCell className="max-w-[200px] truncate">{tx.description}</TableCell>
                           <TableCell>{getStatusBadge(tx.status)}</TableCell>
