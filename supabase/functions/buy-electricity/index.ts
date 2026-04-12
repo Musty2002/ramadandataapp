@@ -313,16 +313,19 @@ async function handlePurchaseElectricity(req: Request, supabase: any, userId: st
 
     if (!response.ok || data.error || data.status === 'error') {
       const errorMsg = data.message || data.error || 'Purchase failed'
-      await updateTransactionFailed(supabase, transaction.id, userId, errorMsg, provider.name, cleanMeter)
+      // Refund the wallet since the API call failed
+      await adminSupabase
+        .from('wallets')
+        .update({ balance: deductResult + amount })
+        .eq('user_id', userId)
+      await updateTransactionFailed(adminSupabase, transaction.id, userId, errorMsg, provider.name, cleanMeter)
       return new Response(JSON.stringify({ error: errorMsg }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       })
     }
 
-    // Debit wallet
-    const newBalance = Number(wallet.balance) - amount
-    await supabase.from('wallets').update({ balance: newBalance }).eq('user_id', userId)
+    // Wallet was already debited atomically before the API call
 
     // Update transaction success
     await supabase
