@@ -13,6 +13,9 @@ import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/T
 import { withTimeout } from '@/lib/supabaseWithTimeout';
 import { useConnectionTimeout } from '@/hooks/useConnectionTimeout';
 import { ConnectionTimeoutOverlay } from '@/components/NetworkStatus';
+import { useRecentRecipients } from '@/hooks/useRecentRecipients';
+import { ContactPickerButton } from '@/components/ContactPickerButton';
+import { SavedRecipients } from '@/components/SavedRecipients';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -78,6 +81,12 @@ export default function Data() {
 
   // Connection timeout detection - shows overlay if stuck loading for 12s
   const { isTimedOut, resetTimeout } = useConnectionTimeout(loading, { timeout: 12000 });
+  const { recipients, saveRecipient, removeRecipient } = useRecentRecipients('data');
+
+  const handlePickFromContacts = ({ phone, name }: { phone: string; name?: string }) => {
+    setPhoneNumber(phone);
+    if (name) saveRecipient(phone, name);
+  };
 
   useEffect(() => {
     if (selectedNetwork) {
