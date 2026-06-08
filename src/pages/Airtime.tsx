@@ -10,6 +10,9 @@ import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
+import { useRecentRecipients } from '@/hooks/useRecentRecipients';
+import { ContactPickerButton } from '@/components/ContactPickerButton';
+import { SavedRecipients } from '@/components/SavedRecipients';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -78,6 +81,23 @@ export default function Airtime() {
   const [pendingPurchase, setPendingPurchase] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<LastTransaction | null>(null);
+  const { recipients, saveRecipient, removeRecipient } = useRecentRecipients('airtime');
+
+  const handlePickFromContacts = ({ phone, name }: { phone: string; name?: string }) => {
+    setPhoneNumber(phone);
+    const detected = detectNetwork(phone);
+    if (detected) setSelectedNetwork(detected);
+    if (name) {
+      // Pre-save so the chip shows the name on next visit
+      saveRecipient(phone, name);
+    }
+  };
+
+  const handleSelectSaved = (phone: string) => {
+    setPhoneNumber(phone);
+    const detected = detectNetwork(phone);
+    if (detected) setSelectedNetwork(detected);
+  };
 
   // Fetch best airtime plan when network changes
   useEffect(() => {
