@@ -1,6 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Delete, Fingerprint, Loader2, LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -28,33 +27,22 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
   const [shake, setShake] = useState(false);
   const [loading, setLoading] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
-  
+
   const { toast } = useToast();
-  
-  const { 
-    isAvailable: biometricAvailable, 
+
+  const {
+    isAvailable: biometricAvailable,
     isEnabled: biometricEnabled,
     verifyIdentity,
   } = useBiometricAuth();
 
   const showBiometricOption = biometricAvailable && biometricEnabled;
 
-  // Get initials from full name
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
   const triggerShake = () => {
     setShake(true);
     setTimeout(() => setShake(false), 400);
   };
 
-  // Handle biometric unlock
   const handleBiometricUnlock = useCallback(async () => {
     setBiometricLoading(true);
     try {
@@ -73,32 +61,29 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
     }
   }, [verifyIdentity, onUnlock]);
 
-  // Handle PIN digit input
   const handleDigit = async (digit: string) => {
+    if (loading || pin.length >= PIN_LENGTH) return;
     setError('');
-    
-    if (pin.length < PIN_LENGTH) {
-      const newPin = pin + digit;
-      setPin(newPin);
-      
-      if (newPin.length === PIN_LENGTH) {
-        setLoading(true);
-        try {
-          const isValid = await verifyTransactionPin(newPin);
-          if (isValid) {
-            onUnlock();
-          } else {
-            setError('Incorrect PIN');
-            triggerShake();
-            setPin('');
-          }
-        } catch {
-          setError('Verification failed');
+    const newPin = pin + digit;
+    setPin(newPin);
+
+    if (newPin.length === PIN_LENGTH) {
+      setLoading(true);
+      try {
+        const isValid = await verifyTransactionPin(newPin);
+        if (isValid) {
+          onUnlock();
+        } else {
+          setError('Incorrect PIN');
           triggerShake();
           setPin('');
-        } finally {
-          setLoading(false);
         }
+      } catch {
+        setError('Verification failed');
+        triggerShake();
+        setPin('');
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -116,13 +101,57 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
     onLogout();
   };
 
+  // Auto-trigger biometric on mount if available
+  useEffect(() => {
+    if (showBiometricOption) {
+      handleBiometricUnlock();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const keys: Array<{ label: string; action: () => void; type?: 'digit' | 'action'; icon?: React.ReactNode; disabled?: boolean }> = [
+    ...[1, 2, 3, 4, 5, 6, 7, 8, 9].map(d => ({
+      label: String(d),
+      action: () => handleDigit(String(d)),
+      type: 'digit' as const,
+    })),
+    {
+      label: 'bio',
+      type: 'action',
+      icon: biometricLoading ? (
+        <Loader2 className="w-6 h-6 animate-spin" />
+      ) : (
+        <Fingerprint className={`w-7 h-7 ${showBiometricOption ? 'text-primary' : 'text-muted-foreground/30'}`} />
+      ),
+      action: handleBiometricUnlock,
+      disabled: !showBiometricOption || biometricLoading,
+    },
+    { label: '0', action: () => handleDigit('0'), type: 'digit' },
+    {
+      label: 'del',
+      type: 'action',
+      icon: <Delete className="w-6 h-6 text-foreground/70" />,
+      action: handleDelete,
+      disabled: pin.length === 0,
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex flex-col bg-secondary/30 overflow-y-auto">
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-start pt-8 sm:pt-16 px-4 sm:px-6">
-        {/* Avatar with golden ring */}
-        <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full p-1 bg-gradient-to-br from-primary via-primary/80 to-primary/60 shadow-lg">
-          <Avatar className="w-full h-full border-2 border-background">
+    <div
+      className="fixed inset-0 flex flex-col bg-gradient-to-b from-primary/10 via-background to-background overflow-hidden"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      {/* Decorative blobs */}
+      <div className="pointer-events-none absolute -top-24 -left-16 w-72 h-72 rounded-full bg-primary/20 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 w-72 h-72 rounded-full bg-primary/10 blur-3xl" />
+
+      {/* Top: avatar + welcome */}
+      <div className="relative flex flex-col items-center pt-8 px-6">
+        <div className="w-24 h-24 rounded-full p-[3px] bg-gradient-to-br from-primary via-primary/70 to-primary/40 shadow-xl shadow-primary/20">
+          <Avatar className="w-full h-full border-[3px] border-background">
             <AvatarImage src={storedUser.avatarUrl || defaultAvatar} alt={storedUser.fullName} />
             <AvatarFallback className="bg-primary/10">
               <img src={defaultAvatar} alt="Default avatar" className="w-full h-full object-cover" />
@@ -130,111 +159,79 @@ export function AppLockScreen({ storedUser, onUnlock, onLogout }: AppLockScreenP
           </Avatar>
         </div>
 
-        {/* Welcome Text */}
-        <h1 className="text-xl sm:text-2xl font-bold mt-4 sm:mt-6 text-foreground">Welcome Back</h1>
-        <p className="text-muted-foreground text-sm mt-1">{storedUser.fullName}</p>
-        <p className="text-muted-foreground/60 text-xs sm:text-sm mt-1">Enter your PIN to unlock</p>
+        <h1 className="text-2xl font-bold mt-5 text-foreground tracking-tight">Welcome Back</h1>
+        <p className="text-foreground/80 text-sm mt-1 font-medium">{storedUser.fullName}</p>
+        <p className="text-muted-foreground text-xs mt-1">Enter your PIN to unlock</p>
 
-        {/* PIN Dots */}
-        <div className={`flex justify-center gap-3 sm:gap-4 mt-5 sm:mt-8 ${shake ? 'animate-shake' : ''}`}>
+        {/* PIN dots */}
+        <div className={`flex justify-center gap-4 mt-6 ${shake ? 'animate-shake' : ''}`}>
           {Array.from({ length: PIN_LENGTH }).map((_, i) => (
             <div
               key={i}
-              className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 transition-all duration-200 ${
+              className={`w-3.5 h-3.5 rounded-full border-2 transition-all duration-200 ${
                 i < pin.length
-                  ? 'bg-primary border-primary scale-110'
-                  : 'border-muted-foreground/40 bg-transparent'
+                  ? 'bg-primary border-primary scale-125 shadow-md shadow-primary/40'
+                  : 'border-muted-foreground/30 bg-transparent'
               }`}
             />
           ))}
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <p className="text-destructive text-sm mt-3">{error}</p>
-        )}
+        {/* Status line */}
+        <div className="h-5 mt-3 flex items-center">
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+          ) : error ? (
+            <p className="text-destructive text-sm font-medium">{error}</p>
+          ) : null}
+        </div>
+      </div>
 
-        {/* Loading Indicator */}
-        {loading && (
-          <div className="mt-3">
-            <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-primary" />
-          </div>
-        )}
-
-        {/* Number Pad */}
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 mt-5 sm:mt-8 max-w-[220px] sm:max-w-[280px] w-full">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
-            <Button
-              key={digit}
-              variant="secondary"
-              size="lg"
-              className="h-13 w-13 sm:h-16 sm:w-16 mx-auto text-xl sm:text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
-              onClick={() => handleDigit(String(digit))}
-              disabled={loading}
+      {/* Keypad - flex grows to fill */}
+      <div className="flex-1 flex flex-col justify-end px-6 pb-2">
+        <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
+          {keys.map((k, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={k.action}
+              disabled={loading || k.disabled}
+              className={`
+                aspect-square w-full max-w-[80px] mx-auto rounded-full
+                flex items-center justify-center
+                text-2xl font-semibold
+                transition-all duration-150
+                active:scale-90
+                disabled:opacity-40
+                ${k.type === 'digit'
+                  ? 'bg-card text-foreground shadow-md shadow-black/5 hover:bg-primary/5 active:bg-primary/10'
+                  : 'bg-transparent hover:bg-card/60'}
+              `}
             >
-              {digit}
-            </Button>
+              {k.icon ?? k.label}
+            </button>
           ))}
-          
-          {/* Biometric Button */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
-            onClick={handleBiometricUnlock}
-            disabled={!showBiometricOption || biometricLoading || loading}
-          >
-            {biometricLoading ? (
-              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
-            ) : (
-              <Fingerprint className={`w-5 h-5 sm:w-6 sm:h-6 ${showBiometricOption ? 'text-primary' : 'text-muted-foreground/40'}`} />
-            )}
-          </Button>
-
-          {/* Zero */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto text-xl sm:text-2xl font-semibold rounded-full bg-card shadow-sm hover:bg-muted"
-            onClick={() => handleDigit('0')}
-            disabled={loading}
-          >
-            0
-          </Button>
-
-          {/* Delete Button */}
-          <Button
-            variant="secondary"
-            size="lg"
-            className="h-13 w-13 sm:h-16 sm:w-16 mx-auto rounded-full bg-card shadow-sm hover:bg-muted"
-            onClick={handleDelete}
-            disabled={pin.length === 0 || loading}
-          >
-            <Delete className="w-5 h-5 sm:w-6 sm:h-6" />
-          </Button>
         </div>
 
-        {/* Use Password Link */}
+        {/* Use password */}
         <button
           onClick={handleUsePassword}
-          className="text-foreground font-medium text-sm mt-5 sm:mt-8 underline underline-offset-2"
+          className="text-primary font-semibold text-sm mt-5 mx-auto block"
           disabled={loading}
         >
           Use password instead
         </button>
       </div>
 
-      {/* Bottom Actions */}
-      <div className="pb-6 sm:pb-8 px-4 sm:px-6 flex justify-between items-center">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="w-12 h-12 rounded-full bg-card shadow-sm"
+      {/* Bottom actions */}
+      <div className="px-6 pb-4 pt-2 flex justify-between items-center">
+        <button
           onClick={handleUsePassword}
+          className="w-11 h-11 rounded-full bg-card shadow-md shadow-black/5 flex items-center justify-center active:scale-95 transition-transform"
+          aria-label="Sign out"
         >
-          <LogOut className="w-5 h-5" />
-        </Button>
-        
+          <LogOut className="w-5 h-5 text-foreground/70" />
+        </button>
         <WhatsAppButton />
       </div>
     </div>
