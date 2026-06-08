@@ -361,7 +361,10 @@ export default function Airtime() {
 
           {/* Phone Number */}
           <div className="mb-6">
-            <Label htmlFor="phone">Phone Number</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <ContactPickerButton onPick={handlePickFromContacts} />
+            </div>
             <Input
               id="phone"
               type="tel"
@@ -369,30 +372,21 @@ export default function Airtime() {
               placeholder="08012345678"
               value={phoneNumber}
               onChange={(e) => {
-                // Get raw value and filter to digits only
                 const rawValue = e.target.value;
                 const digitsOnly = rawValue.replace(/\D/g, '');
-                // Always update state to allow backspace to work
                 setPhoneNumber(digitsOnly);
-                
-                // Auto-detect network from phone number
                 const detected = detectNetwork(digitsOnly);
                 if (detected && detected !== selectedNetwork) {
                   setSelectedNetwork(detected);
                 }
               }}
               onKeyDown={(e) => {
-                // Allow: backspace, delete, tab, escape, enter, arrows
                 const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
-                if (allowedKeys.includes(e.key)) {
-                  return;
-                }
-                // Block non-numeric input
+                if (allowedKeys.includes(e.key)) return;
                 if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                   e.preventDefault();
                 }
               }}
-              className="mt-2"
               maxLength={11}
               autoComplete="tel"
             />
@@ -401,6 +395,11 @@ export default function Airtime() {
                 Network detected: <span className="font-medium text-primary">{networks.find(n => n.id === selectedNetwork)?.name}</span>
               </p>
             )}
+            <SavedRecipients
+              recipients={recipients}
+              onSelect={handleSelectSaved}
+              onRemove={removeRecipient}
+            />
           </div>
 
           {/* Amount */}
