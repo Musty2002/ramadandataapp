@@ -256,6 +256,9 @@ export default function Airtime() {
       }
 
       if (data?.success) {
+        // Save recipient for quick re-use
+        saveRecipient(cleanPhone);
+
         // Set last transaction for receipt
         setLastTransaction({
           id: data.transaction_id || crypto.randomUUID(),
@@ -266,7 +269,7 @@ export default function Airtime() {
           type: 'airtime',
         });
         setShowReceipt(true);
-        
+
         toast({
           title: 'Success',
           description: data.message || 'Airtime purchase successful!',
