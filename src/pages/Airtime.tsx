@@ -10,6 +10,9 @@ import { ToastAction } from '@/components/ui/toast';
 import { supabase } from '@/integrations/supabase/client';
 import { TransactionPinDialog, isTransactionPinSetup } from '@/components/auth/TransactionPinDialog';
 import { TransactionReceipt } from '@/components/TransactionReceipt';
+import { useRecentRecipients } from '@/hooks/useRecentRecipients';
+import { ContactPickerButton } from '@/components/ContactPickerButton';
+import { SavedRecipients } from '@/components/SavedRecipients';
 
 import mtnLogo from '@/assets/mtn-logo.png';
 import airtelLogo from '@/assets/airtel-logo.jpg';
@@ -78,6 +81,23 @@ export default function Airtime() {
   const [pendingPurchase, setPendingPurchase] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
   const [lastTransaction, setLastTransaction] = useState<LastTransaction | null>(null);
+  const { recipients, saveRecipient, removeRecipient } = useRecentRecipients('airtime');
+
+  const handlePickFromContacts = ({ phone, name }: { phone: string; name?: string }) => {
+    setPhoneNumber(phone);
+    const detected = detectNetwork(phone);
+    if (detected) setSelectedNetwork(detected);
+    if (name) {
+      // Pre-save so the chip shows the name on next visit
+      saveRecipient(phone, name);
+    }
+  };
+
+  const handleSelectSaved = (phone: string) => {
+    setPhoneNumber(phone);
+    const detected = detectNetwork(phone);
+    if (detected) setSelectedNetwork(detected);
+  };
 
   // Fetch best airtime plan when network changes
   useEffect(() => {
@@ -236,6 +256,9 @@ export default function Airtime() {
       }
 
       if (data?.success) {
+        // Save recipient for quick re-use
+        saveRecipient(cleanPhone);
+
         // Set last transaction for receipt
         setLastTransaction({
           id: data.transaction_id || crypto.randomUUID(),
@@ -246,7 +269,7 @@ export default function Airtime() {
           type: 'airtime',
         });
         setShowReceipt(true);
-        
+
         toast({
           title: 'Success',
           description: data.message || 'Airtime purchase successful!',
@@ -338,7 +361,10 @@ export default function Airtime() {
 
           {/* Phone Number */}
           <div className="mb-6">
-            <Label htmlFor="phone">Phone Number</Label>
+            <div className="flex items-center justify-between mb-2">
+              <Label htmlFor="phone">Phone Number</Label>
+              <ContactPickerButton onPick={handlePickFromContacts} />
+            </div>
             <Input
               id="phone"
               type="tel"
@@ -346,30 +372,21 @@ export default function Airtime() {
               placeholder="08012345678"
               value={phoneNumber}
               onChange={(e) => {
-                // Get raw value and filter to digits only
                 const rawValue = e.target.value;
                 const digitsOnly = rawValue.replace(/\D/g, '');
-                // Always update state to allow backspace to work
                 setPhoneNumber(digitsOnly);
-                
-                // Auto-detect network from phone number
                 const detected = detectNetwork(digitsOnly);
                 if (detected && detected !== selectedNetwork) {
                   setSelectedNetwork(detected);
                 }
               }}
               onKeyDown={(e) => {
-                // Allow: backspace, delete, tab, escape, enter, arrows
                 const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
-                if (allowedKeys.includes(e.key)) {
-                  return;
-                }
-                // Block non-numeric input
+                if (allowedKeys.includes(e.key)) return;
                 if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                   e.preventDefault();
                 }
               }}
-              className="mt-2"
               maxLength={11}
               autoComplete="tel"
             />
@@ -378,6 +395,11 @@ export default function Airtime() {
                 Network detected: <span className="font-medium text-primary">{networks.find(n => n.id === selectedNetwork)?.name}</span>
               </p>
             )}
+            <SavedRecipients
+              recipients={recipients}
+              onSelect={handleSelectSaved}
+              onRemove={removeRecipient}
+            />
           </div>
 
           {/* Amount */}
