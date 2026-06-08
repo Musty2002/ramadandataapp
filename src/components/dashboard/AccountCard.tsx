@@ -199,7 +199,7 @@ export function AccountCard() {
   const displayName = profile?.full_name || 'User';
 
   return (
-    <div className="gradient-primary rounded-2xl p-4 sm:p-5 text-primary-foreground mx-4 shadow-lg">
+    <div className="bg-gradient-to-br from-sky-300 to-sky-500 rounded-2xl p-4 sm:p-5 text-white mx-4 shadow-lg">
       {/* Greeting & Name */}
       <div className="mb-3 sm:mb-4">
         <p className="text-sm opacity-80">Hello,</p>
