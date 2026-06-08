@@ -286,6 +286,7 @@ export default function Data() {
       }
 
       if (data?.success) {
+        saveRecipient(cleanPhone);
         // Show receipt
         setLastTransaction({
           id: data.transaction_id || crypto.randomUUID(),
@@ -547,7 +548,10 @@ export default function Data() {
 
               {/* Phone number input */}
               <div>
-                <Label htmlFor="phone" className="text-base font-semibold">Phone Number</Label>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="phone" className="text-base font-semibold">Phone Number</Label>
+                  <ContactPickerButton onPick={handlePickFromContacts} />
+                </div>
                 <Input
                   id="phone"
                   type="tel"
@@ -555,26 +559,25 @@ export default function Data() {
                   placeholder="08012345678"
                   value={phoneNumber}
                   onChange={(e) => {
-                    // Get raw value and filter to digits only
                     const rawValue = e.target.value;
                     const digitsOnly = rawValue.replace(/\D/g, '');
-                    // Always update state to allow backspace to work
                     setPhoneNumber(digitsOnly);
                   }}
                   onKeyDown={(e) => {
-                    // Allow: backspace, delete, tab, escape, enter, arrows
                     const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
-                    if (allowedKeys.includes(e.key)) {
-                      return;
-                    }
-                    // Block non-numeric input
+                    if (allowedKeys.includes(e.key)) return;
                     if (!/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey) {
                       e.preventDefault();
                     }
                   }}
-                  className="mt-2 h-12 text-lg"
+                  className="h-12 text-lg"
                   maxLength={11}
                   autoComplete="tel"
+                />
+                <SavedRecipients
+                  recipients={recipients}
+                  onSelect={(p) => setPhoneNumber(p)}
+                  onRemove={removeRecipient}
                 />
               </div>
 
