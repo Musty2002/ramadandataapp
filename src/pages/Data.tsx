@@ -546,6 +546,22 @@ export default function Data() {
                 </div>
               </div>
 
+              {/* Owing warning for gifting bundles */}
+              {selectedPlan.category?.toLowerCase() === 'gifting' && (
+                <div className="flex gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-300">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-semibold">Don't buy if you're owing</p>
+                    <p className="mt-1">
+                      If this line owes the network (borrowed airtime or data), the bundle may be
+                      used to clear the debt and will not be delivered. Purchases are non-refundable
+                      in that case.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+
               {/* Phone number input */}
               <div>
                 <div className="flex items-center justify-between mb-2">
