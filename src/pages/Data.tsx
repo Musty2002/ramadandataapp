@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MobileLayout } from '@/components/layout/MobileLayout';
-import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft, RefreshCw, WifiOff } from 'lucide-react';
+import { ArrowLeft, Check, Loader2, ChevronRight, ChevronLeft, RefreshCw, WifiOff, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
