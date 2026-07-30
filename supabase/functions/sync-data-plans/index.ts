@@ -329,6 +329,7 @@ const ALBARKA_STATIC_PLANS: Record<string, any[]> = {
     { plan_id: 22, plan_type: 'COOPERATE GIFTING', plan_name: '3GB', amount: 1560, validity: '30 days' },
     { plan_id: 23, plan_type: 'COOPERATE GIFTING', plan_name: '5GB', amount: 2600, validity: '30 days' },
     { plan_id: 24, plan_type: 'COOPERATE GIFTING', plan_name: '10GB', amount: 9000, validity: '30 days' },
+    { plan_id: 79, plan_type: 'GIFTING', plan_name: '1GB', amount: 250, validity: '30 days' },
     { plan_id: 84, plan_type: 'GIFTING', plan_name: '1GB', amount: 200, validity: '1 day' },
     { plan_id: 85, plan_type: 'GIFTING', plan_name: '2.5GB', amount: 500, validity: 'Daily' },
     { plan_id: 86, plan_type: 'GIFTING', plan_name: '500MB', amount: 485, validity: '7 days' },
