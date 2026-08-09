@@ -129,8 +129,9 @@ export default function Data() {
        const allPlans = (data || []) as unknown as DataPlan[];
        setPlans(allPlans);
 
-       const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
-       setCategories(uniqueCategories);
+       const uniqueCategories = [...new Set(allPlans.map(getPlanGroup).filter(Boolean))] as string[];
+       setCategories(uniqueCategories.sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))));
+
        setLoadError(null);
     } catch (error) {
       console.error('Error fetching plans:', error);
