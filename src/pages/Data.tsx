@@ -47,6 +47,46 @@ interface DataPlan {
 
 type Step = 'network' | 'category' | 'plan' | 'confirm';
 
+// Derive a fine-grained plan group from the plan name so different plan types
+// (Awoof, Hot, Smart Data, SME, SME 2, Corporate Gifting, Gifting, ...) never merge.
+const getPlanGroup = (plan: DataPlan): string => {
+  const name = (plan.name || '').toUpperCase();
+  if (name.includes('AWOOF')) return 'awoof';
+  if (name.includes('HOT')) return 'hot';
+  if (name.includes('SMART DATA') || name.includes('SMARTDATA')) return 'smart-data';
+  if (name.includes('DATA SHARE') || name.includes('DATASHARE')) return 'datashare';
+  if (name.includes('COUPON')) return 'coupon';
+  if (
+    name.includes('COOPERATE GIFTING') ||
+    name.includes('CORPORATE GIFTING') ||
+    name.includes('COOPERATION') ||
+    name.includes('CORPORATION') ||
+    /\bCG\b/.test(name)
+  ) return 'corporate-gifting';
+  if (/\bSME\s*2\b/.test(name)) return 'sme-2';
+  if (name.includes('SME')) return 'sme';
+  if (name.includes('GIFTING')) return 'gifting';
+  return (plan.category || 'other').toLowerCase();
+};
+
+const getCategoryLabel = (category: string) => {
+  const labels: Record<string, string> = {
+    sme: 'SME Data',
+    'sme-2': 'SME 2 Data',
+    corporate: 'Corporate Data',
+    'corporate-gifting': 'Corporate Gifting',
+    'cooperate-gifting': 'Corporate Gifting',
+    awoof: 'Awoof Data',
+    hot: 'Hot Data',
+    'smart-data': 'Smart Data',
+    coupon: 'Coupon',
+    gifting: 'Gifting',
+    datashare: 'DataShare',
+    other: 'Other Plans',
+  };
+  return labels[category] || category.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+};
+
 export default function Data() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -129,8 +169,9 @@ export default function Data() {
        const allPlans = (data || []) as unknown as DataPlan[];
        setPlans(allPlans);
 
-       const uniqueCategories = [...new Set(allPlans.map(p => p.category).filter(Boolean))] as string[];
-       setCategories(uniqueCategories);
+       const uniqueCategories = [...new Set(allPlans.map(getPlanGroup).filter(Boolean))] as string[];
+       setCategories(uniqueCategories.sort((a, b) => getCategoryLabel(a).localeCompare(getCategoryLabel(b))));
+
        setLoadError(null);
     } catch (error) {
       console.error('Error fetching plans:', error);
@@ -347,19 +388,8 @@ export default function Data() {
     }).format(price);
   };
 
-  const filteredPlans = plans.filter(p => p.category === selectedCategory);
+  const filteredPlans = plans.filter(p => getPlanGroup(p) === selectedCategory);
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      sme: 'SME Data',
-      corporate: 'Corporate',
-      awoof: 'Awoof Data',
-      coupon: 'Coupon',
-      gifting: 'Gifting',
-      datashare: 'DataShare',
-    };
-    return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
-  };
 
   const getStepTitle = () => {
     switch (step) {
@@ -547,7 +577,7 @@ export default function Data() {
               </div>
 
               {/* Owing warning for gifting bundles */}
-              {selectedPlan.category?.toLowerCase() === 'gifting' && (
+              {getPlanGroup(selectedPlan).includes('gifting') && (
                 <div className="flex gap-3 p-4 rounded-2xl bg-amber-50 border border-amber-300">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-800">
