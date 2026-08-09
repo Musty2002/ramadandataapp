@@ -388,19 +388,8 @@ export default function Data() {
     }).format(price);
   };
 
-  const filteredPlans = plans.filter(p => p.category === selectedCategory);
+  const filteredPlans = plans.filter(p => getPlanGroup(p) === selectedCategory);
 
-  const getCategoryLabel = (category: string) => {
-    const labels: Record<string, string> = {
-      sme: 'SME Data',
-      corporate: 'Corporate',
-      awoof: 'Awoof Data',
-      coupon: 'Coupon',
-      gifting: 'Gifting',
-      datashare: 'DataShare',
-    };
-    return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
-  };
 
   const getStepTitle = () => {
     switch (step) {
