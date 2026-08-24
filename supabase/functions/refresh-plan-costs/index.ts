@@ -87,9 +87,21 @@ Deno.serve(async (req) => {
     // The cron job calls this with the service role key (no user token).
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace('Bearer ', '').trim()
-    const cronSecret = Deno.env.get('CRON_SECRET')
-    const isCron = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret
+
+    // The scheduled job authenticates with a private token stored in app_config
+    const providedCronSecret = req.headers.get('x-cron-secret')
+    let isCron = false
+    if (providedCronSecret) {
+      const { data: cfg } = await supabase
+        .from('app_config')
+        .select('value')
+        .eq('key', 'cron_secret')
+        .maybeSingle()
+      isCron = !!cfg?.value && cfg.value === providedCronSecret
+    }
+
     const isServiceRole = isCron || token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
 
 
     if (!isServiceRole) {
