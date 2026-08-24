@@ -74,6 +74,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_config: {
+        Row: {
+          created_at: string
+          key: string
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          updated_at?: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          updated_at?: string
+          value?: string
+        }
+        Relationships: []
+      }
       cable_bouquets: {
         Row: {
           created_at: string
@@ -349,6 +370,53 @@ export type Database = {
           used?: boolean | null
         }
         Relationships: []
+      }
+      plan_price_history: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          margin: number
+          network: string
+          new_api_price: number
+          old_api_price: number
+          plan_id: string
+          provider: string
+          selling_price: number
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          margin: number
+          network: string
+          new_api_price: number
+          old_api_price: number
+          plan_id: string
+          provider: string
+          selling_price: number
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          margin?: number
+          network?: string
+          new_api_price?: number
+          old_api_price?: number
+          plan_id?: string
+          provider?: string
+          selling_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_price_history_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "data_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
