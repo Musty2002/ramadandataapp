@@ -350,6 +350,53 @@ export type Database = {
         }
         Relationships: []
       }
+      plan_price_history: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+          margin: number
+          network: string
+          new_api_price: number
+          old_api_price: number
+          plan_id: string
+          provider: string
+          selling_price: number
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          id?: string
+          margin: number
+          network: string
+          new_api_price: number
+          old_api_price: number
+          plan_id: string
+          provider: string
+          selling_price: number
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+          margin?: number
+          network?: string
+          new_api_price?: number
+          old_api_price?: number
+          plan_id?: string
+          provider?: string
+          selling_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_price_history_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "data_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           account_number: string
