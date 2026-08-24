@@ -87,7 +87,10 @@ Deno.serve(async (req) => {
     // The cron job calls this with the service role key (no user token).
     const authHeader = req.headers.get('Authorization') || ''
     const token = authHeader.replace('Bearer ', '').trim()
-    const isServiceRole = token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    const cronSecret = Deno.env.get('CRON_SECRET')
+    const isCron = !!cronSecret && req.headers.get('x-cron-secret') === cronSecret
+    const isServiceRole = isCron || token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+
 
     if (!isServiceRole) {
       if (!token) {
