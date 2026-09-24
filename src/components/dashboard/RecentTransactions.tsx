@@ -6,6 +6,7 @@ import { Transaction } from '@/types/database';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { withTimeout } from '@/lib/supabaseWithTimeout';
+import { TransactionReceipt } from '@/components/TransactionReceipt';
 
 function cacheKey(userId: string) {
   return `recent_transactions_v1:${userId}`;
