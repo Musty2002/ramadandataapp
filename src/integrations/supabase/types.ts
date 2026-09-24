@@ -663,6 +663,30 @@ export type Database = {
         }
         Relationships: []
       }
+      verification_prices: {
+        Row: {
+          api_price: number
+          id_type: string
+          is_active: boolean
+          selling_price: number
+          updated_at: string
+        }
+        Insert: {
+          api_price: number
+          id_type: string
+          is_active?: boolean
+          selling_price: number
+          updated_at?: string
+        }
+        Update: {
+          api_price?: number
+          id_type?: string
+          is_active?: boolean
+          selling_price?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       wallets: {
         Row: {
           balance: number
@@ -719,6 +743,7 @@ export type Database = {
         | "referral_bonus"
         | "cable"
         | "exam"
+        | "verification"
       transaction_status: "pending" | "completed" | "failed"
       transaction_type: "credit" | "debit"
     }
@@ -860,6 +885,7 @@ export const Constants = {
         "referral_bonus",
         "cable",
         "exam",
+        "verification",
       ],
       transaction_status: ["pending", "completed", "failed"],
       transaction_type: ["credit", "debit"],
