@@ -36,6 +36,7 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
   const navigate = useNavigate();
 
   const userId = user?.id;
