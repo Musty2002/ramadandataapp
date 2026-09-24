@@ -184,7 +184,8 @@ export function RecentTransactions({ refreshTick = 0 }: { refreshTick?: number }
           {transactions.map((tx) => (
             <div
               key={tx.id}
-              className="bg-card rounded-xl p-4 flex items-center gap-3 shadow-sm"
+              onClick={() => setReceiptTx(tx)}
+              className="bg-card rounded-xl p-4 flex items-center gap-3 shadow-sm cursor-pointer active:scale-[0.98] transition-transform"
             >
               <div
                 className={`w-10 h-10 rounded-full flex items-center justify-center ${
