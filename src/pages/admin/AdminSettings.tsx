@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, UserPlus, Shield } from 'lucide-react';
+import { VerificationPricing } from '@/components/admin/VerificationPricing';
 
 export default function AdminSettings() {
   const [email, setEmail] = useState('');
@@ -146,11 +147,12 @@ export default function AdminSettings() {
                 </div>
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="font-medium">PaymentPoint</span>
-                  <span className="text-sm text-muted-foreground">Virtual Accounts</span>
+                  <span className="text-sm text-muted-foreground">Virtual Accounts, BVN/NIN</span>
                 </div>
               </div>
             </CardContent>
           </Card>
+          <VerificationPricing />
         </div>
       </div>
     </AdminLayout>
