@@ -67,7 +67,7 @@ const services = [
     description: 'Verify your identity',
     path: '/bvn-nin', 
     color: 'bg-orange-100 text-orange-600',
-    comingSoon: true
+    comingSoon: false
   },
   { 
     icon: Gift, 

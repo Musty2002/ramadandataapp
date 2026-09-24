@@ -58,12 +58,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Account Number Card */}
-        <div className="bg-card rounded-xl p-4 mb-6 shadow-sm">
-          <p className="text-xs text-muted-foreground mb-1">Account Number</p>
-          <p className="text-lg font-semibold text-foreground">{profile?.account_number}</p>
-        </div>
-
         {/* Menu Items */}
         <div className="space-y-2 mb-8">
           {menuItems.map(({ icon: Icon, label, path }) => (

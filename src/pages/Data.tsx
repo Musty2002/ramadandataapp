@@ -411,7 +411,7 @@ export default function Data() {
 
   const getStepTitle = () => {
     switch (step) {
-      case 'network': return 'Select Network';
+      case 'network': return 'Enter Phone Number';
       case 'category': return 'Select Category';
       case 'plan': return 'Select Data Plan';
       case 'confirm': return 'Confirm Purchase';
