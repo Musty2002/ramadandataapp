@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Transaction, TransactionCategory } from '@/types/database';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
+import { TransactionReceipt } from '@/components/TransactionReceipt';
 
 function cacheKey(userId: string) {
   return `history_transactions_v1:${userId}`;
@@ -46,6 +47,7 @@ export default function History() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<TransactionCategory | 'all'>('all');
+  const [receiptTx, setReceiptTx] = useState<Transaction | null>(null);
 
   // Hydrate from cache to prevent empty/skeleton UI after background reload
   useEffect(() => {
@@ -224,9 +226,11 @@ export default function History() {
                 <p className="text-xs font-medium text-muted-foreground mb-2">{date}</p>
                 <div className="space-y-2">
                   {txs.map((tx) => (
-                    <div
+                    <button
+                      type="button"
                       key={tx.id}
-                      className="bg-card rounded-xl p-4 flex items-center gap-3 shadow-sm"
+                      onClick={() => setReceiptTx(tx)}
+                      className="w-full text-left bg-card rounded-xl p-4 flex items-center gap-3 shadow-sm active:scale-[0.99] transition-transform"
                     >
                       <div
                         className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -270,7 +274,7 @@ export default function History() {
                           {tx.status}
                         </p>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -278,6 +282,29 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {receiptTx && (() => {
+        const m = (receiptTx.metadata || {}) as Record<string, any>;
+        const typeMap: Record<string, 'airtime' | 'data' | 'electricity' | 'tv' | 'exam'> = {
+          airtime: 'airtime', data: 'data', electricity: 'electricity', tv: 'tv', cable: 'tv', exam: 'exam',
+        };
+        return (
+          <TransactionReceipt
+            open={!!receiptTx}
+            onClose={() => setReceiptTx(null)}
+            transaction={{
+              id: receiptTx.reference || receiptTx.id,
+              date: new Date(receiptTx.created_at),
+              phoneNumber: m.phone_number || m.meter_number || m.smartcard_number || m.smart_card_number || m.id_number_masked || '',
+              network: m.network || m.disco || m.provider_code || '',
+              amount: Number(receiptTx.amount),
+              type: typeMap[receiptTx.category] || 'data',
+              dataPlan: m.plan_name || m.display_name || undefined,
+              description: `${receiptTx.description} • ${receiptTx.status}`,
+            }}
+          />
+        );
+      })()}
     </MobileLayout>
   );
 }
