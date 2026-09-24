@@ -47,6 +47,25 @@ interface DataPlan {
 
 type Step = 'network' | 'category' | 'plan' | 'confirm';
 
+const NETWORK_PREFIXES: Record<string, string[]> = {
+  mtn: ['0803', '0806', '0703', '0706', '0810', '0813', '0814', '0816', '0903', '0906', '0913', '0916', '0704', '07025', '07026'],
+  airtel: ['0802', '0808', '0708', '0812', '0701', '0902', '0901', '0904', '0907', '0912', '0911'],
+  glo: ['0805', '0807', '0705', '0815', '0811', '0905', '0915'],
+  '9mobile': ['0809', '0818', '0817', '0909', '0908'],
+};
+
+function detectNetwork(phone: string): string | null {
+  const p = phone.replace(/\D/g, '').replace(/^234/, '0');
+  if (p.length < 4) return null;
+  // Check longer prefixes first
+  for (const len of [5, 4]) {
+    for (const [net, prefixes] of Object.entries(NETWORK_PREFIXES)) {
+      if (prefixes.some((pre) => pre.length === len && p.startsWith(pre))) return net;
+    }
+  }
+  return null;
+}
+
 // Derive a fine-grained plan group from the plan name so different plan types
 // (Awoof, Hot, Smart Data, SME, SME 2, Corporate Gifting, Gifting, ...) never merge.
 const getPlanGroup = (plan: DataPlan): string => {
@@ -228,7 +247,6 @@ export default function Data() {
     switch (step) {
       case 'category':
         setStep('network');
-        setSelectedNetwork(null);
         break;
       case 'plan':
         setStep('category');
@@ -443,23 +461,64 @@ export default function Data() {
         <div className="px-4 pb-6">
           {/* Step 1: Network Selection */}
           {step === 'network' && (
-            <div className="grid grid-cols-2 gap-4">
-              {networks.map((network) => (
-                <button
-                  key={network.id}
-                  onClick={() => handleNetworkSelect(network.id)}
-                  className="p-6 rounded-2xl border-2 transition-all bg-card hover:border-primary/50 hover:shadow-md active:scale-95"
-                >
-                  <div className="w-16 h-16 rounded-full mx-auto mb-3 overflow-hidden shadow-md">
-                    <img 
-                      src={network.logo} 
-                      alt={`${network.name} logo`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <p className="text-sm font-semibold text-center">{network.name}</p>
-                </button>
-              ))}
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="phone-first" className="text-base font-semibold">Phone Number</Label>
+                  <ContactPickerButton onPick={(c) => { handlePickFromContacts(c); const n = detectNetwork(c.phone); if (n) setSelectedNetwork(n); }} />
+                </div>
+                <Input
+                  id="phone-first"
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="08012345678"
+                  value={phoneNumber}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 11);
+                    setPhoneNumber(digits);
+                    const n = detectNetwork(digits);
+                    if (n) setSelectedNetwork(n);
+                  }}
+                  className="h-12 text-lg"
+                  maxLength={11}
+                  autoComplete="tel"
+                />
+                <SavedRecipients
+                  recipients={recipients}
+                  onSelect={(p) => { setPhoneNumber(p); const n = detectNetwork(p); if (n) setSelectedNetwork(n); }}
+                  onRemove={removeRecipient}
+                />
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold mb-2">
+                  {selectedNetwork ? 'Network detected — tap to change' : 'Select Network'}
+                </p>
+                <div className="grid grid-cols-4 gap-3">
+                  {networks.map((network) => (
+                    <button
+                      key={network.id}
+                      onClick={() => setSelectedNetwork(network.id)}
+                      className={`p-3 rounded-2xl border-2 transition-all bg-card active:scale-95 ${
+                        selectedNetwork === network.id ? 'border-primary bg-primary/5' : 'border-border'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-full mx-auto mb-1 overflow-hidden shadow-md">
+                        <img src={network.logo} alt={`${network.name} logo`} className="w-full h-full object-cover" />
+                      </div>
+                      <p className="text-xs font-semibold text-center">{network.name}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <Button
+                className="w-full h-12 text-base font-semibold"
+                disabled={phoneNumber.length !== 11 || !selectedNetwork}
+                onClick={() => selectedNetwork && handleNetworkSelect(selectedNetwork)}
+              >
+                Continue
+              </Button>
             </div>
           )}
 
