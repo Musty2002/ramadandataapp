@@ -50,10 +50,17 @@ export function VerificationPricing() {
                 Active <Switch checked={row.is_active} onCheckedChange={(v) => update(row.id_type, { is_active: v })} />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">API cost: ₦{row.api_price} · Profit: ₦{(Number(row.selling_price) - Number(row.api_price)).toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Profit: ₦{(Number(row.selling_price) - Number(row.api_price)).toFixed(2)}</p>
             <div className="flex gap-2">
-              <Input type="number" value={row.selling_price} onChange={(e) => update(row.id_type, { selling_price: e.target.value as unknown as number })} />
-              <Button onClick={() => save(row)} disabled={saving === row.id_type}>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">API cost</Label>
+                <Input type="number" value={row.api_price} onChange={(e) => update(row.id_type, { api_price: e.target.value as unknown as number })} />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Selling price</Label>
+                <Input type="number" value={row.selling_price} onChange={(e) => update(row.id_type, { selling_price: e.target.value as unknown as number })} />
+              </div>
+              <Button className="self-end" onClick={() => save(row)} disabled={saving === row.id_type}>
                 {saving === row.id_type && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save
               </Button>
             </div>
