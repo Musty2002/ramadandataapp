@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -29,7 +30,7 @@ export function VerificationPricing() {
     setSaving(row.id_type);
     const { error } = await supabase
       .from('verification_prices')
-      .update({ selling_price: Number(row.selling_price), is_active: row.is_active, updated_at: new Date().toISOString() })
+      .update({ api_price: Number(row.api_price), selling_price: Number(row.selling_price), is_active: row.is_active, updated_at: new Date().toISOString() })
       .eq('id_type', row.id_type);
     setSaving(null);
     toast(error ? { variant: 'destructive', title: 'Error', description: error.message } : { title: 'Saved', description: `${row.id_type.toUpperCase()} price updated` });
@@ -50,10 +51,17 @@ export function VerificationPricing() {
                 Active <Switch checked={row.is_active} onCheckedChange={(v) => update(row.id_type, { is_active: v })} />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">API cost: ₦{row.api_price} · Profit: ₦{(Number(row.selling_price) - Number(row.api_price)).toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">Profit: ₦{(Number(row.selling_price) - Number(row.api_price)).toFixed(2)}</p>
             <div className="flex gap-2">
-              <Input type="number" value={row.selling_price} onChange={(e) => update(row.id_type, { selling_price: e.target.value as unknown as number })} />
-              <Button onClick={() => save(row)} disabled={saving === row.id_type}>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">API cost</Label>
+                <Input type="number" value={row.api_price} onChange={(e) => update(row.id_type, { api_price: e.target.value as unknown as number })} />
+              </div>
+              <div className="flex-1 space-y-1">
+                <Label className="text-xs text-muted-foreground">Selling price</Label>
+                <Input type="number" value={row.selling_price} onChange={(e) => update(row.id_type, { selling_price: e.target.value as unknown as number })} />
+              </div>
+              <Button className="self-end" onClick={() => save(row)} disabled={saving === row.id_type}>
                 {saving === row.id_type && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save
               </Button>
             </div>
