@@ -649,6 +649,9 @@ export default function AdminDataPlans() {
                     onCheckedChange={(v) => setEditingPlan({ ...editingPlan, is_active: v })}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Note: automated cost sync (every 6 hours) may overwrite manually edited API prices for iSquare and RGC plans.
+                </p>
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span>Margin:</span>
