@@ -29,7 +29,7 @@ export function VerificationPricing() {
     setSaving(row.id_type);
     const { error } = await supabase
       .from('verification_prices')
-      .update({ selling_price: Number(row.selling_price), is_active: row.is_active, updated_at: new Date().toISOString() })
+      .update({ api_price: Number(row.api_price), selling_price: Number(row.selling_price), is_active: row.is_active, updated_at: new Date().toISOString() })
       .eq('id_type', row.id_type);
     setSaving(null);
     toast(error ? { variant: 'destructive', title: 'Error', description: error.message } : { title: 'Saved', description: `${row.id_type.toUpperCase()} price updated` });
