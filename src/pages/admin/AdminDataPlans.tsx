@@ -150,6 +150,7 @@ export default function AdminDataPlans() {
       const { error } = await supabase
         .from('data_plans')
         .update({
+          api_price: editingPlan.api_price,
           selling_price: editingPlan.selling_price,
           is_active: editingPlan.is_active,
           display_name: editingPlan.display_name,
