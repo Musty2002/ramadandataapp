@@ -621,7 +621,14 @@ export default function AdminDataPlans() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>API Price</Label>
-                    <Input value={`₦${editingPlan.api_price}`} disabled />
+                    <Input
+                      type="number"
+                      value={editingPlan.api_price}
+                      onChange={(e) => setEditingPlan({
+                        ...editingPlan,
+                        api_price: parseFloat(e.target.value) || 0
+                      })}
+                    />
                   </div>
                   <div>
                     <Label>Your Selling Price</Label>
