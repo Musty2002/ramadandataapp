@@ -150,6 +150,7 @@ export default function AdminDataPlans() {
       const { error } = await supabase
         .from('data_plans')
         .update({
+          api_price: editingPlan.api_price,
           selling_price: editingPlan.selling_price,
           is_active: editingPlan.is_active,
           display_name: editingPlan.display_name,
@@ -620,7 +621,14 @@ export default function AdminDataPlans() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>API Price</Label>
-                    <Input value={`₦${editingPlan.api_price}`} disabled />
+                    <Input
+                      type="number"
+                      value={editingPlan.api_price}
+                      onChange={(e) => setEditingPlan({
+                        ...editingPlan,
+                        api_price: parseFloat(e.target.value) || 0
+                      })}
+                    />
                   </div>
                   <div>
                     <Label>Your Selling Price</Label>
@@ -641,6 +649,9 @@ export default function AdminDataPlans() {
                     onCheckedChange={(v) => setEditingPlan({ ...editingPlan, is_active: v })}
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Note: automated cost sync (every 6 hours) may overwrite manually edited API prices for iSquare and RGC plans.
+                </p>
                 <div className="p-3 bg-muted rounded-lg">
                   <div className="flex justify-between text-sm">
                     <span>Margin:</span>
